@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:gestor_gastos/providers/gastos_provider.dart';
 
 class AgregarDetallePage extends StatefulWidget {
-  final Function(Map<String, dynamic>) onGuardar;
-  final Function()? onEliminar;
-  final List<String> responsables;
-  final double? gastoTotal;
-  final List<Map<String, dynamic>> subGastos;
   final Map<String, dynamic>? gastoExistente;
+  final int? gastoIndex;
+  final bool esSubGasto;
+  final List<String> responsables;
+  final Function(String) onAgregarResponsable;
 
   const AgregarDetallePage({
     super.key,
-    required this.onGuardar,
-    required this.responsables,
-    this.onEliminar,
-    this.gastoTotal,
-    required this.subGastos,
     this.gastoExistente,
+    this.gastoIndex,
+    this.esSubGasto = false,
+    required this.responsables,
+    required this.onAgregarResponsable,
   });
 
   @override
@@ -26,18 +26,15 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nombreController;
   late TextEditingController _precioController;
-  late String? responsable;
+  String? responsable;
+  String? _errorMensaje;
+
   @override
   void initState() {
     super.initState();
     _nombreController = TextEditingController(text: widget.gastoExistente?['nombre'] ?? '');
     _precioController = TextEditingController(text: widget.gastoExistente?['precio']?.toString() ?? '');
     responsable = widget.gastoExistente?['responsable'];
-
-    // Si el responsable no está en la lista, lo ponemos en null
-    if (responsable != null && !widget.responsables.contains(responsable)) {
-      responsable = null;
-    }
   }
 
   @override
@@ -47,23 +44,62 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
     super.dispose();
   }
 
+  void _validarYGuardar(BuildContext context) {
+    final gastosProvider = Provider.of<GastosProvider>(context, listen: false);
+    final double precioIngresado = double.tryParse(_precioController.text) ?? 0.0;
+
+    if (widget.esSubGasto && widget.gastoIndex != null) {
+      final gastoPadre = gastosProvider.gastos[widget.gastoIndex!];
+      final double totalSubGastos =
+          gastoPadre['subGastos'].fold<double>(0.0, (double sum, dynamic item) => sum + ((item['precio'] ?? 0.0).toDouble())) + precioIngresado;
+
+      final double totalGastoPrincipal = gastoPadre['precio'] ?? 0.0;
+
+      if (totalSubGastos > totalGastoPrincipal) {
+        setState(() {
+          _errorMensaje = 'El total de subgastos no puede superar el gasto principal (\$${totalGastoPrincipal.toStringAsFixed(2)})';
+        });
+        return;
+      }
+    }
+
+    if (_formKey.currentState!.validate() && responsable != null) {
+      Map<String, dynamic> nuevoGasto = {
+        'nombre': _nombreController.text,
+        'precio': precioIngresado,
+        'responsable': responsable ?? gastosProvider.gastos[widget.gastoIndex!]['responsable'],
+      };
+
+      if (widget.esSubGasto && widget.gastoIndex != null) {
+        gastosProvider.agregarSubGasto(widget.gastoIndex!, nuevoGasto);
+      } else if (widget.gastoExistente != null && widget.gastoIndex != null) {
+        gastosProvider.editarGasto(widget.gastoIndex!, nuevoGasto);
+      } else {
+        gastosProvider.agregarGasto(nuevoGasto);
+      }
+
+      Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    double totalGastado = widget.subGastos.fold(0.0, (sum, item) => sum + double.parse(item['precio'].toString()));
-    double montoDisponible = widget.gastoTotal != null ? widget.gastoTotal! - totalGastado : double.infinity;
-
     return Scaffold(
-      appBar: AppBar(title: Text(widget.gastoExistente != null ? 'Editar Gasto' : 'Agregar Gasto')),
+      appBar: AppBar(
+        title: Text(
+          widget.esSubGasto
+              ? 'Agregar Subgasto'
+              : widget.gastoExistente != null
+              ? 'Editar Gasto'
+              : 'Agregar Gasto',
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
           child: Column(
             children: [
-              Text(
-                'Disponible: \$${montoDisponible.toStringAsFixed(2)}',
-                style: TextStyle(color: montoDisponible < 0 ? Colors.red : Colors.black),
-              ),
               TextFormField(
                 controller: _nombreController,
                 decoration: const InputDecoration(labelText: 'Nombre'),
@@ -71,25 +107,19 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
               ),
               TextFormField(
                 controller: _precioController,
-                decoration: InputDecoration(
-                  labelText: 'Precio',
-                  errorText: (_precioController.text.isNotEmpty &&
-                          double.tryParse(_precioController.text) != null &&
-                          double.parse(_precioController.text) > montoDisponible)
-                      ? 'Supera el gasto total'
-                      : null,
-                ),
+                decoration: InputDecoration(labelText: 'Precio', errorText: _errorMensaje),
                 keyboardType: TextInputType.number,
+                validator: (value) => (value!.isEmpty || double.tryParse(value) == null) ? 'Ingrese un número válido' : null,
               ),
               DropdownButtonFormField<String>(
                 value: responsable,
                 items: [
                   ...widget.responsables.map((e) => DropdownMenuItem(value: e, child: Text(e))),
-                  const DropdownMenuItem(value: 'nuevo', child: Text('➕ Agregar Nuevo')),
+                  const DropdownMenuItem(value: 'nuevo', child: Text('➕ Agregar Nuevo Responsable')),
                 ],
                 onChanged: (value) {
                   if (value == 'nuevo') {
-                    _mostrarDialogoNuevoResponsable();
+                    _mostrarDialogoNuevoResponsable(context);
                   } else {
                     setState(() {
                       responsable = value;
@@ -99,74 +129,99 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                 decoration: const InputDecoration(labelText: 'Responsable'),
               ),
               const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (widget.gastoExistente != null)
-                    ElevatedButton(
-                      onPressed: () {
-                        if (widget.onEliminar != null) {
-                          widget.onEliminar!();
-                        }
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                      child: const Text('Eliminar', style: TextStyle(color: Colors.white)),
-                    ),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState!.validate() && responsable != null) {
-                        widget.onGuardar({
-                          'nombre': _nombreController.text,
-                          'precio': _precioController.text,
-                          'responsable': responsable,
-                        });
-                        Navigator.pop(context);
-                      }
-                    },
-                    child: const Text('Guardar Gasto'),
-                  ),
-                ],
-              ),
+              ElevatedButton(onPressed: () => _validarYGuardar(context), child: Text(widget.esSubGasto ? 'Guardar Subgasto' : 'Guardar Gasto')),
             ],
           ),
         ),
       ),
     );
   }
+void _mostrarDialogoNuevoResponsable(BuildContext context) {
+  TextEditingController controller = TextEditingController();
+  List<String> responsablesFiltrados = List.from(widget.responsables);
 
-  void _mostrarDialogoNuevoResponsable() {
-    TextEditingController controller = TextEditingController();
+  showDialog(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            title: const Text('Seleccionar o Agregar Responsable'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      labelText: 'Buscar o Crear Responsable',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (query) {
+                      setStateDialog(() {
+                        responsablesFiltrados = widget.responsables
+                            .where((responsable) => responsable
+                                .toLowerCase()
+                                .contains(query.toLowerCase()))
+                            .toList();
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 200,
+                    child: responsablesFiltrados.isNotEmpty
+                        ? ListView.builder(
+                            itemCount: responsablesFiltrados.length,
+                            itemBuilder: (context, index) {
+                              return ListTile(
+                                title: Text(responsablesFiltrados[index]),
+                                onTap: () {
+                                  setState(() {
+                                    responsable = responsablesFiltrados[index];
+                                  });
+                                  Navigator.pop(context);
+                                },
+                              );
+                            },
+                          )
+                        : const Center(child: Text('No hay resultados')),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (controller.text.isNotEmpty) {
+                    // 🔥 Add the new responsible person
+                    widget.onAgregarResponsable(controller.text);
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Agregar Nuevo Responsable'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(labelText: 'Nombre'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  setState(() {
-                    widget.responsables.add(controller.text);
-                    responsable = controller.text;
-                  });
-                }
-                Navigator.pop(context);
-              },
-              child: const Text('Agregar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+                    // 🔥 Ensure "nuevo" is NEVER the selected value
+                    setState(() {
+                      responsable = controller.text;
+                    });
+
+                    // 🔥 Force UI update in parent widget
+                    Navigator.pop(context);
+                    Future.delayed(Duration(milliseconds: 100), () {
+                      setState(() {}); // Refresh UI to reflect new responsible person
+                    });
+                  }
+                },
+                child: const Text('Agregar y Asignar'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
 }

@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:gestor_gastos/pages/home_page.dart';
+import '/providers/gastos_provider.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => GastosProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -18,4 +27,4 @@ class MyApp extends StatelessWidget {
       home: const HomePage(title: 'Gestor de Gastos'),
     );
   }
-  }
+}
