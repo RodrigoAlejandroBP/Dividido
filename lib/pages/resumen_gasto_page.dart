@@ -13,33 +13,43 @@ class ResumenGastoPage extends StatefulWidget {
 
 class _ResumenGastoPageState extends State<ResumenGastoPage> {
   Map<int, bool> subgastosIndividuales = {};
-  Map<String, bool> mostrarTodos = {}; // Controla el despliegue de subgastos
-
-  void eliminarSubGasto(String responsable, Map<String, dynamic> subGasto) {
-    setState(() {
-      widget.gasto['subGastos'].remove(subGasto);
-    });
-  }
+  Map<String, bool> mostrarTodos = {};
 
   @override
   Widget build(BuildContext context) {
-    Set<String> responsables = {};
+    Set<String> responsables = {widget.gasto['responsable']};
     double totalPrecio = double.parse(widget.gasto['precio'].toString());
     double totalGastoComun = totalPrecio;
     Map<String, double> gastosIndividuales = {};
     Map<String, List<Map<String, dynamic>>> subgastosPorResponsable = {};
 
+    gastosIndividuales[widget.gasto['responsable']] = 0.0;
+    subgastosPorResponsable[widget.gasto['responsable']] = [];
+
+    // Primero, recolectar todos los responsables
     for (var i = 0; i < widget.gasto['subGastos'].length; i++) {
       var subGasto = widget.gasto['subGastos'][i];
-      String responsable = subGasto['responsable'];
+      String responsableSubGasto = subGasto['responsable'];
+      responsables.add(responsableSubGasto);
+      subgastosPorResponsable.putIfAbsent(responsableSubGasto, () => []);
+      subgastosPorResponsable[responsableSubGasto]!.add(subGasto);
+    }
+
+    // Luego, procesar los subgastos con el número final de responsables
+    for (var i = 0; i < widget.gasto['subGastos'].length; i++) {
+      var subGasto = widget.gasto['subGastos'][i];
+      String responsableSubGasto = subGasto['responsable'];
       double precio = double.parse(subGasto['precio'].toString());
       bool esIndividual = subgastosIndividuales[i] ?? false;
-      responsables.add(responsable);
-      subgastosPorResponsable.putIfAbsent(responsable, () => []);
-      subgastosPorResponsable[responsable]!.add(subGasto);
 
       if (esIndividual) {
-        gastosIndividuales[responsable] = (gastosIndividuales[responsable] ?? 0) + precio;
+        gastosIndividuales[responsableSubGasto] = (gastosIndividuales[responsableSubGasto] ?? 0) + precio;
+        totalGastoComun -= precio;
+      } else {
+        double precioPorResponsable = precio / responsables.length;
+        for (var responsable in responsables) {
+          gastosIndividuales[responsable] = (gastosIndividuales[responsable] ?? 0) + precioPorResponsable;
+        }
         totalGastoComun -= precio;
       }
     }
@@ -48,7 +58,7 @@ class _ResumenGastoPageState extends State<ResumenGastoPage> {
 
     Map<String, double> totalPorResponsable = {};
     for (var responsable in responsables) {
-      totalPorResponsable[responsable] = (gastosIndividuales[responsable] ?? 0) + gastoComunPorPersona;
+      totalPorResponsable[responsable] = ((gastosIndividuales[responsable] ?? 0) + gastoComunPorPersona);
     }
 
     return Scaffold(
@@ -80,16 +90,7 @@ class _ResumenGastoPageState extends State<ResumenGastoPage> {
                                 return ListTile(
                                   title: Text(subgasto['nombre'] ?? 'Sin Detalle', style: const TextStyle(fontWeight: FontWeight.bold)),
                                   subtitle: Text.rich(
-                                    TextSpan(
-                                      children: [
-                                        // TextSpan(
-                                        //   text: '${subgasto['responsable']}',
-                                        //   style: const TextStyle(fontWeight: FontWeight.bold), // Negrita para el responsable
-                                        // ),
-                                        const TextSpan(text: ' • '),
-                                        TextSpan(text: 'Monto: \$${subgasto['precio'] ?? 0.0}'),
-                                      ],
-                                    ),
+                                    TextSpan(children: [const TextSpan(text: ' • '), TextSpan(text: 'Monto: \$${subgasto['precio'] ?? 0.0}')]),
                                   ),
                                   trailing: Checkbox(
                                     value: subgastosIndividuales[widget.gasto['subGastos'].indexOf(subgasto)] ?? false,

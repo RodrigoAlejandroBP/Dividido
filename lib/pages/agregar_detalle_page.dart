@@ -28,7 +28,8 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
   late TextEditingController _precioController;
   String? responsable;
   String? _errorMensaje;
-  int? _subGastoIndex; // Nueva variable para el índice del subgasto
+  int? _subGastoIndex;
+  double? _montoDisponible;
 
   @override
   void initState() {
@@ -36,7 +37,8 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
     _nombreController = TextEditingController(text: widget.gastoExistente?['nombre'] ?? '');
     _precioController = TextEditingController(text: widget.gastoExistente?['precio']?.toString() ?? '');
     responsable = widget.gastoExistente?['responsable'];
-    _subGastoIndex = widget.gastoExistente?['subGastoIndex']; // Obtener el índice del subgasto
+    _subGastoIndex = widget.gastoExistente?['subGastoIndex'];
+    _calcularMontoDisponible();
   }
 
   @override
@@ -46,18 +48,43 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
     super.dispose();
   }
 
+  void _calcularMontoDisponible() {
+    if (widget.esSubGasto && widget.gastoIndex != null) {
+      final gastosProvider = Provider.of<GastosProvider>(context, listen: false);
+      final gastoPadre = gastosProvider.gastos[widget.gastoIndex!];
+      double totalSubGastos = 0.0;
+
+      for (int i = 0; i < gastoPadre['subGastos'].length; i++) {
+        if (i != _subGastoIndex) {
+          totalSubGastos += (gastoPadre['subGastos'][i]['precio'] ?? 0.0).toDouble();
+        }
+      }
+
+      final double totalGastoPrincipal = gastoPadre['precio'] ?? 0.0;
+      setState(() {
+        _montoDisponible = totalGastoPrincipal - totalSubGastos;
+      });
+    }
+  }
+
   void _validarYGuardar(BuildContext context) {
     final gastosProvider = Provider.of<GastosProvider>(context, listen: false);
     final double precioIngresado = double.tryParse(_precioController.text) ?? 0.0;
+
+    // Validación para subgastos: no permitir precio 0
+    if (precioIngresado <= 0) {
+      setState(() {
+        _errorMensaje = 'El precio debe ser mayor a 0';
+      });
+      return;
+    }
 
     if (widget.esSubGasto && widget.gastoIndex != null) {
       final gastoPadre = gastosProvider.gastos[widget.gastoIndex!];
       double totalSubGastos = 0.0;
 
-      // Calcular el total de subgastos excluyendo el subgasto que se está editando
       for (int i = 0; i < gastoPadre['subGastos'].length; i++) {
         if (i != _subGastoIndex) {
-          // Excluir el subgasto actual si se está editando
           totalSubGastos += (gastoPadre['subGastos'][i]['precio'] ?? 0.0).toDouble();
         }
       }
@@ -82,10 +109,8 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
 
       if (widget.esSubGasto && widget.gastoIndex != null) {
         if (_subGastoIndex != null) {
-          // Editar subgasto existente
           gastosProvider.editarSubGasto(widget.gastoIndex!, _subGastoIndex!, nuevoGasto);
         } else {
-          // Agregar nuevo subgasto
           gastosProvider.agregarSubGasto(widget.gastoIndex!, nuevoGasto);
         }
       } else if (widget.gastoExistente != null && widget.gastoIndex != null) {
@@ -116,6 +141,14 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
           key: _formKey,
           child: Column(
             children: [
+              if (widget.esSubGasto && _montoDisponible != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Text(
+                    'Monto disponible: \$${_montoDisponible!.toStringAsFixed(2)}',
+                    style: TextStyle(color: _montoDisponible! < 0 ? Colors.red : Colors.green, fontWeight: FontWeight.bold),
+                  ),
+                ),
               TextFormField(
                 controller: _nombreController,
                 decoration: const InputDecoration(labelText: 'Nombre'),
@@ -125,7 +158,13 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                 controller: _precioController,
                 decoration: InputDecoration(labelText: 'Precio', errorText: _errorMensaje),
                 keyboardType: TextInputType.number,
-                validator: (value) => (value!.isEmpty || double.tryParse(value) == null) ? 'Ingrese un número válido' : null,
+                validator: (value) {
+                  if (value!.isEmpty || double.tryParse(value) == null) return 'Ingrese un número válido';
+                  if (widget.esSubGasto && (double.tryParse(value) ?? 0) <= 0) return 'El precio debe ser mayor a 0';
+
+                  return null;
+                },
+                onChanged: (value) => _calcularMontoDisponible(), // Opcional: actualizar dinámicamente
               ),
               DropdownButtonFormField<String>(
                 value: responsable,
@@ -208,18 +247,13 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                 TextButton(
                   onPressed: () {
                     if (controller.text.isNotEmpty) {
-                      // 🔥 Add the new responsible person
                       widget.onAgregarResponsable(controller.text);
-
-                      // 🔥 Ensure "nuevo" is NEVER the selected value
                       setState(() {
                         responsable = controller.text;
                       });
-
-                      // 🔥 Force UI update in parent widget
                       Navigator.pop(context);
                       Future.delayed(Duration(milliseconds: 100), () {
-                        setState(() {}); // Refresh UI to reflect new responsible person
+                        setState(() {});
                       });
                     }
                   },

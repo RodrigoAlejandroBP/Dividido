@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-// , aparte cuando lo mantengo presionado se elimina, en ves de eliminarse deberia permitirme editarlo llevandome a la misma pestaña de editar como la q tiene
-
 class GastosProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _gastos = [];
   List<String> _responsables = [];
@@ -10,12 +8,22 @@ class GastosProvider extends ChangeNotifier {
   List<String> get responsables => _responsables;
 
   void agregarGasto(Map<String, dynamic> gasto) {
-    _gastos.add({...gasto, 'subGastos': []});
+    _gastos.add({
+      ...gasto,
+      'subGastos': [],
+      'fecha': gasto['fecha'] ?? DateTime.now(), // Fecha por defecto: hoy
+      'etiquetas': gasto['etiquetas'] ?? [], // Lista de etiquetas, por defecto vacía
+    });
     notifyListeners();
   }
 
   void editarGasto(int index, Map<String, dynamic> gastoEditado) {
-    _gastos[index] = {...gastoEditado, 'subGastos': List<Map<String, dynamic>>.from(_gastos[index]['subGastos'])};
+    _gastos[index] = {
+      ...gastoEditado,
+      'subGastos': List<Map<String, dynamic>>.from(_gastos[index]['subGastos']),
+      'fecha': gastoEditado['fecha'] ?? _gastos[index]['fecha'],
+      'etiquetas': gastoEditado['etiquetas'] ?? _gastos[index]['etiquetas'],
+    };
     notifyListeners();
   }
 
