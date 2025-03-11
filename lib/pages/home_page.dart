@@ -5,6 +5,7 @@ import 'package:gestor_gastos/widgets/gastos_widget.dart';
 import 'package:gestor_gastos/widgets/responsables_widget.dart';
 import 'package:gestor_gastos/pages/agregar_detalle_page.dart';
 import 'package:gestor_gastos/pages/resumen_gasto_page.dart';
+import 'package:gestor_gastos/pages/resumen_mensual_page.dart'; // Nuevo import
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key, required this.title});
@@ -38,6 +39,13 @@ class HomePage extends StatelessWidget {
     );
   }
 
+  void _verResumenMensual(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ResumenMensualPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -57,6 +65,14 @@ class HomePage extends StatelessWidget {
               leading: const Icon(Icons.money),
               title: const Text('Gastos'),
               onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_today),
+              title: const Text('Resumen Mensual'),
+              onTap: () {
+                Navigator.pop(context);
+                _verResumenMensual(context);
+              },
             ),
             Consumer<GastosProvider>(
               builder: (context, gastosProvider, child) {

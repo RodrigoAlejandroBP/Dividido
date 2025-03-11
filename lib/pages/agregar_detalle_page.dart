@@ -26,18 +26,22 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nombreController;
   late TextEditingController _precioController;
+  late TextEditingController _etiquetasController; // Nuevo controlador para etiquetas
   String? responsable;
   String? _errorMensaje;
   int? _subGastoIndex;
   double? _montoDisponible;
+  DateTime? _fechaSeleccionada; // Nueva variable para la fecha
 
   @override
   void initState() {
     super.initState();
     _nombreController = TextEditingController(text: widget.gastoExistente?['nombre'] ?? '');
     _precioController = TextEditingController(text: widget.gastoExistente?['precio']?.toString() ?? '');
+    _etiquetasController = TextEditingController(text: widget.gastoExistente?['etiquetas']?.join(', ') ?? '');
     responsable = widget.gastoExistente?['responsable'];
     _subGastoIndex = widget.gastoExistente?['subGastoIndex'];
+    _fechaSeleccionada = widget.gastoExistente?['fecha'] ?? DateTime.now();
     _calcularMontoDisponible();
   }
 
@@ -45,6 +49,7 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
   void dispose() {
     _nombreController.dispose();
     _precioController.dispose();
+    _etiquetasController.dispose();
     super.dispose();
   }
 
@@ -71,10 +76,9 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
     final gastosProvider = Provider.of<GastosProvider>(context, listen: false);
     final double precioIngresado = double.tryParse(_precioController.text) ?? 0.0;
 
-    // Validación para subgastos: no permitir precio 0
-    if (precioIngresado <= 0) {
+    if (widget.esSubGasto && precioIngresado <= 0) {
       setState(() {
-        _errorMensaje = 'El precio debe ser mayor a 0';
+        _errorMensaje = 'El precio del subgasto debe ser mayor a 0';
       });
       return;
     }
@@ -105,6 +109,8 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
         'nombre': _nombreController.text,
         'precio': precioIngresado,
         'responsable': responsable ?? gastosProvider.gastos[widget.gastoIndex!]['responsable'],
+        'fecha': _fechaSeleccionada, // Guardar la fecha seleccionada
+        'etiquetas': _etiquetasController.text.split(',').map((e) => e.trim()).toList(), // Convertir texto a lista
       };
 
       if (widget.esSubGasto && widget.gastoIndex != null) {
@@ -120,6 +126,20 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
       }
 
       Navigator.pop(context);
+    }
+  }
+
+  Future<void> _seleccionarFecha(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _fechaSeleccionada ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null && picked != _fechaSeleccionada) {
+      setState(() {
+        _fechaSeleccionada = picked;
+      });
     }
   }
 
@@ -158,14 +178,28 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                 controller: _precioController,
                 decoration: InputDecoration(labelText: 'Precio', errorText: _errorMensaje),
                 keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value!.isEmpty || double.tryParse(value) == null) return 'Ingrese un número válido';
-                  if (widget.esSubGasto && (double.tryParse(value) ?? 0) <= 0) return 'El precio debe ser mayor a 0';
-
-                  return null;
-                },
-                onChanged: (value) => _calcularMontoDisponible(), // Opcional: actualizar dinámicamente
+                validator: (value) => (value!.isEmpty || double.tryParse(value) == null) ? 'Ingrese un número válido' : null,
+                onChanged: (value) => _calcularMontoDisponible(),
               ),
+              if (!widget.esSubGasto) // Solo para gastos principales
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Fecha: ${_fechaSeleccionada != null ? "${_fechaSeleccionada!.day}/${_fechaSeleccionada!.month}/${_fechaSeleccionada!.year}" : "No seleccionada"}',
+                        ),
+                      ),
+                      ElevatedButton(onPressed: () => _seleccionarFecha(context), child: const Text('Seleccionar Fecha')),
+                    ],
+                  ),
+                ),
+              if (!widget.esSubGasto) // Solo para gastos principales
+                TextFormField(
+                  controller: _etiquetasController,
+                  decoration: const InputDecoration(labelText: 'Etiquetas (separadas por comas)', hintText: 'Ej: Comida, Transporte'),
+                ),
               DropdownButtonFormField<String>(
                 value: responsable,
                 items: [
@@ -246,7 +280,8 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
                 TextButton(
                   onPressed: () {
-                    if (controller.text.isNotEmpty) {
+                    if (controller.text.isNotEmpty && controller.text.length >= 2) {
+                      // Validación de longitud mínima
                       widget.onAgregarResponsable(controller.text);
                       setState(() {
                         responsable = controller.text;
@@ -255,6 +290,10 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                       Future.delayed(Duration(milliseconds: 100), () {
                         setState(() {});
                       });
+                    } else {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(const SnackBar(content: Text('El nombre del responsable debe tener al menos 2 caracteres')));
                     }
                   },
                   child: const Text('Agregar y Asignar'),

@@ -11,8 +11,8 @@ class GastosProvider extends ChangeNotifier {
     _gastos.add({
       ...gasto,
       'subGastos': [],
-      'fecha': gasto['fecha'] ?? DateTime.now(), // Fecha por defecto: hoy
-      'etiquetas': gasto['etiquetas'] ?? [], // Lista de etiquetas, por defecto vacía
+      'fecha': gasto['fecha'] ?? DateTime.now(),
+      'etiquetas': gasto['etiquetas'] ?? [],
     });
     notifyListeners();
   }
@@ -33,25 +33,65 @@ class GastosProvider extends ChangeNotifier {
   }
 
   void agregarSubGasto(int gastoIndex, Map<String, dynamic> subGasto) {
-    _gastos[gastoIndex]['subGastos'].add(subGasto);
-    _gastos[gastoIndex] = {..._gastos[gastoIndex], 'subGastos': List<Map<String, dynamic>>.from(_gastos[gastoIndex]['subGastos'])};
+    _gastos[gastoIndex]['subGastos'].add({
+      ...subGasto,
+      'esIndividual': subGasto['esIndividual'] ?? false, // Por defecto no individual
+    });
     notifyListeners();
   }
 
   void eliminarSubGasto(int gastoIndex, int subGastoIndex) {
     _gastos[gastoIndex]['subGastos'].removeAt(subGastoIndex);
-    _gastos[gastoIndex] = {..._gastos[gastoIndex], 'subGastos': List<Map<String, dynamic>>.from(_gastos[gastoIndex]['subGastos'])};
     notifyListeners();
   }
 
   void editarSubGasto(int gastoIndex, int subGastoIndex, Map<String, dynamic> subGastoEditado) {
-    _gastos[gastoIndex]['subGastos'][subGastoIndex] = subGastoEditado;
-    _gastos[gastoIndex] = {..._gastos[gastoIndex], 'subGastos': List<Map<String, dynamic>>.from(_gastos[gastoIndex]['subGastos'])};
+    _gastos[gastoIndex]['subGastos'][subGastoIndex] = {
+      ...subGastoEditado,
+      'esIndividual': subGastoEditado['esIndividual'] ?? _gastos[gastoIndex]['subGastos'][subGastoIndex]['esIndividual'] ?? false,
+    };
     notifyListeners();
   }
 
   void agregarResponsable(String responsable) {
     _responsables.add(responsable);
     notifyListeners();
+  }
+
+  Map<String, double> calcularTotalPorResponsable(Map<String, dynamic> gasto) {
+    Set<String> responsables = {gasto['responsable'] as String};
+    double totalPrecio = double.parse(gasto['precio'].toString());
+    double totalGastoComun = totalPrecio;
+    Map<String, double> gastosIndividuales = {};
+
+    gastosIndividuales[gasto['responsable'] as String] = 0.0;
+
+    final subGastos = (gasto['subGastos'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+    for (var subGasto in subGastos) {
+      String responsableSubGasto = subGasto['responsable'] as String;
+      double precio = double.parse(subGasto['precio'].toString());
+      bool esIndividual = subGasto['esIndividual'] as bool? ?? false;
+
+      responsables.add(responsableSubGasto);
+
+      if (esIndividual) {
+        gastosIndividuales[responsableSubGasto] = (gastosIndividuales[responsableSubGasto] ?? 0) + precio;
+        totalGastoComun -= precio;
+      } else {
+        double precioPorResponsable = precio / responsables.length;
+        for (var responsable in responsables) {
+          gastosIndividuales[responsable] = (gastosIndividuales[responsable] ?? 0) + precioPorResponsable;
+        }
+        totalGastoComun -= precio;
+      }
+    }
+
+    double gastoComunPorPersona = (responsables.isNotEmpty && totalGastoComun > 0) ? totalGastoComun / responsables.length : 0.0;
+    Map<String, double> totalPorResponsable = {};
+    for (var responsable in responsables) {
+      totalPorResponsable[responsable] = (gastosIndividuales[responsable] ?? 0) + gastoComunPorPersona;
+    }
+
+    return totalPorResponsable;
   }
 }

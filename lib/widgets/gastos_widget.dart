@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:provider/provider.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
 import 'package:gestor_gastos/pages/agregar_detalle_page.dart';
 
@@ -34,10 +34,7 @@ class GastosWidget extends StatelessWidget {
               child: ExpansionTile(
                 leading: CircleAvatar(
                   backgroundColor: Colors.green,
-                  child: Text(
-                    gasto['responsable'][0] + gasto['responsable'][1],
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
+                  child: Text(_getInitials(gasto['responsable']), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
                 title: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,8 +77,9 @@ class GastosWidget extends StatelessWidget {
                 children:
                     subGastos.isNotEmpty
                         ? subGastos.asMap().entries.map((entry) {
-                          int subGastoIndex = entry.key; // Índice del subgasto
+                          int subGastoIndex = entry.key;
                           Map<String, dynamic> subgasto = entry.value;
+                          bool esIndividual = subgasto['esIndividual'] as bool? ?? false;
 
                           return Slidable(
                             endActionPane: ActionPane(
@@ -142,7 +140,7 @@ class GastosWidget extends StatelessWidget {
                                 leading: CircleAvatar(
                                   backgroundColor: Colors.blue,
                                   child: Text(
-                                    subgasto['responsable'][0] + subgasto['responsable'][1],
+                                    _getInitials(subgasto['responsable']),
                                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                                   ),
                                 ),
@@ -156,6 +154,19 @@ class GastosWidget extends StatelessWidget {
                                     ],
                                   ),
                                 ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (esIndividual) const Icon(Icons.person, color: Colors.green, size: 20),
+                                    if (!esIndividual) const Icon(Icons.group, color: Colors.grey, size: 20),
+                                    Checkbox(
+                                      value: esIndividual,
+                                      onChanged: (bool? value) {
+                                        gastosProvider.editarSubGasto(index, subGastoIndex, {...subgasto, 'esIndividual': value ?? false});
+                                      },
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           );
@@ -167,6 +178,12 @@ class GastosWidget extends StatelessWidget {
         );
       },
     );
+  }
+
+  String _getInitials(String responsable) {
+    if (responsable.isEmpty) return '?';
+    if (responsable.length == 1) return responsable[0];
+    return responsable[0] + responsable[1];
   }
 
   PopupMenuItem<String> _buildMenuItem(String value, IconData icon, String text, [Color? color]) {

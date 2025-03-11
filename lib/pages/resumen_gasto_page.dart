@@ -12,54 +12,23 @@ class ResumenGastoPage extends StatefulWidget {
 }
 
 class _ResumenGastoPageState extends State<ResumenGastoPage> {
-  Map<int, bool> subgastosIndividuales = {};
-  Map<String, bool> mostrarTodos = {};
-
   @override
   Widget build(BuildContext context) {
-    Set<String> responsables = {widget.gasto['responsable']};
+    final gastosProvider = Provider.of<GastosProvider>(context, listen: false);
     double totalPrecio = double.parse(widget.gasto['precio'].toString());
-    double totalGastoComun = totalPrecio;
-    Map<String, double> gastosIndividuales = {};
+    final subGastos = (widget.gasto['subGastos'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+    int gastoIndex = gastosProvider.gastos.indexOf(widget.gasto);
+
+    // Calcular totales usando la función del provider
+    Map<String, double> totalPorResponsable = gastosProvider.calcularTotalPorResponsable(widget.gasto);
+
+    // Preparar subgastos por responsable para la UI
     Map<String, List<Map<String, dynamic>>> subgastosPorResponsable = {};
-
-    gastosIndividuales[widget.gasto['responsable']] = 0.0;
-    subgastosPorResponsable[widget.gasto['responsable']] = [];
-
-    // Primero, recolectar todos los responsables
-    for (var i = 0; i < widget.gasto['subGastos'].length; i++) {
-      var subGasto = widget.gasto['subGastos'][i];
-      String responsableSubGasto = subGasto['responsable'];
-      responsables.add(responsableSubGasto);
-      subgastosPorResponsable.putIfAbsent(responsableSubGasto, () => []);
-      subgastosPorResponsable[responsableSubGasto]!.add(subGasto);
+    for (var subGasto in subGastos) {
+      String responsableSubGasto = subGasto['responsable'] as String;
+      subgastosPorResponsable.putIfAbsent(responsableSubGasto, () => []).add(subGasto);
     }
-
-    // Luego, procesar los subgastos con el número final de responsables
-    for (var i = 0; i < widget.gasto['subGastos'].length; i++) {
-      var subGasto = widget.gasto['subGastos'][i];
-      String responsableSubGasto = subGasto['responsable'];
-      double precio = double.parse(subGasto['precio'].toString());
-      bool esIndividual = subgastosIndividuales[i] ?? false;
-
-      if (esIndividual) {
-        gastosIndividuales[responsableSubGasto] = (gastosIndividuales[responsableSubGasto] ?? 0) + precio;
-        totalGastoComun -= precio;
-      } else {
-        double precioPorResponsable = precio / responsables.length;
-        for (var responsable in responsables) {
-          gastosIndividuales[responsable] = (gastosIndividuales[responsable] ?? 0) + precioPorResponsable;
-        }
-        totalGastoComun -= precio;
-      }
-    }
-
-    double gastoComunPorPersona = (responsables.isNotEmpty && totalGastoComun > 0) ? totalGastoComun / responsables.length : 0.0;
-
-    Map<String, double> totalPorResponsable = {};
-    for (var responsable in responsables) {
-      totalPorResponsable[responsable] = ((gastosIndividuales[responsable] ?? 0) + gastoComunPorPersona);
-    }
+    subgastosPorResponsable[widget.gasto['responsable'] as String] ??= [];
 
     return Scaffold(
       appBar: AppBar(title: const Text('Resumen del Gasto')),
@@ -73,39 +42,50 @@ class _ResumenGastoPageState extends State<ResumenGastoPage> {
             const SizedBox(height: 20),
             Expanded(
               child: ListView(
-                children:
-                    totalPorResponsable.entries.map<Widget>((entry) {
-                      return Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        child: ExpansionTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.orange[300],
-                            child: Text(entry.key[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ),
-                          title: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('Total: \$${entry.value.toStringAsFixed(2)}'),
-                          children:
-                              subgastosPorResponsable[entry.key]?.map((subgasto) {
-                                return ListTile(
-                                  title: Text(subgasto['nombre'] ?? 'Sin Detalle', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text.rich(
-                                    TextSpan(children: [const TextSpan(text: ' • '), TextSpan(text: 'Monto: \$${subgasto['precio'] ?? 0.0}')]),
-                                  ),
-                                  trailing: Checkbox(
-                                    value: subgastosIndividuales[widget.gasto['subGastos'].indexOf(subgasto)] ?? false,
-                                    onChanged: (bool? value) {
-                                      setState(() {
-                                        subgastosIndividuales[widget.gasto['subGastos'].indexOf(subgasto)] = value ?? false;
-                                      });
-                                    },
-                                  ),
-                                );
-                              }).toList() ??
-                              [],
+                children: totalPorResponsable.entries.map<Widget>((entry) {
+                  return Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: ExpansionTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.orange[300],
+                        child: Text(
+                          entry.key.isNotEmpty ? entry.key[0] : '?',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                         ),
-                      );
-                    }).toList(),
+                      ),
+                      title: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text('Total: \$${entry.value.toStringAsFixed(2)}'),
+                      children: subgastosPorResponsable[entry.key]?.map((subgasto) {
+                        int subGastoIndex = subGastos.indexOf(subgasto);
+                        return ListTile(
+                          title: Text(subgasto['nombre'] ?? 'Sin Detalle', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text.rich(
+                            TextSpan(
+                              children: [
+                                const TextSpan(text: ' • '),
+                                TextSpan(text: 'Monto: \$${subgasto['precio'] ?? 0.0}'),
+                              ],
+                            ),
+                          ),
+                          trailing: Checkbox(
+                            value: subgasto['esIndividual'] as bool? ?? false,
+                            onChanged: (bool? value) {
+                              setState(() {
+                                // Actualizar el estado en el subgasto
+                                Map<String, dynamic> subGastoActualizado = {
+                                  ...subgasto,
+                                  'esIndividual': value ?? false,
+                                };
+                                gastosProvider.editarSubGasto(gastoIndex, subGastoIndex, subGastoActualizado);
+                              });
+                            },
+                          ),
+                        );
+                      }).toList() ?? [],
+                    ),
+                  );
+                }).toList(),
               ),
             ),
           ],

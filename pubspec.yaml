@@ -36,6 +36,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   provider: ^6.0.5
   flutter_slidable: ^3.0.0
+  fl_chart: ^0.68.0  # Para gráficos en ResumenMensualPage
+  font_awesome_flutter: ^10.0.0  # Para íconos personalizados
+
   
 dev_dependencies:
   flutter_test:
