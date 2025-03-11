@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
+import 'package:gestor_gastos/pages/agregar_detalle_page.dart';
 import 'package:gestor_gastos/widgets/menu_opciones.dart';
 import 'package:gestor_gastos/widgets/subgasto_item.dart';
 
@@ -25,7 +26,9 @@ class GastoItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var subGastos = (gasto['subGastos'] as List).map((e) => Map<String, dynamic>.from(e)).toList();
+    var subGastos = (gasto['subGastos'] as List)
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
 
     return Card(
       elevation: 4,
@@ -33,23 +36,23 @@ class GastoItem extends StatelessWidget {
       child: ExpansionTile(
         leading: CircleAvatar(
           backgroundColor: Colors.green,
-          child: Text(gasto['responsable'][0]+gasto['responsable'][1],
+          child: Text(gasto['responsable'][0] + gasto['responsable'][1],
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         ),
         title: Text(gasto['nombre'] ?? 'Sin Nombre',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         subtitle: Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: '${gasto['responsable']}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold), // Negrita para el responsable
-                                      ),
-                                      const TextSpan(text: ' • '),
-                                      TextSpan(text: 'Monto: \$${gasto['precio'] ?? 0.0}'),
-                                    ],
-                                  ),
-                                ),
+          TextSpan(
+            children: [
+              TextSpan(
+                text: '${gasto['responsable']}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const TextSpan(text: ' • '),
+              TextSpan(text: 'Monto: \$${gasto['precio'] ?? 0.0}'),
+            ],
+          ),
+        ),
         trailing: PopupMenuButton<String>(
           onSelected: (value) {
             switch (value) {
@@ -75,7 +78,15 @@ class GastoItem extends StatelessWidget {
           ],
         ),
         children: subGastos.isNotEmpty
-            ? subGastos.map((subgasto) => SubGastoItem(subgasto: subgasto, index: index)).toList()
+            ? subGastos.asMap().entries.map((entry) {
+                int subGastoIndex = entry.key;
+                Map<String, dynamic> subgasto = entry.value;
+                return SubGastoItem(
+                  subgasto: subgasto,
+                  gastoIndex: index,
+                  subGastoIndex: subGastoIndex,
+                );
+              }).toList()
             : [const ListTile(title: Text('No hay subgastos'))],
       ),
     );

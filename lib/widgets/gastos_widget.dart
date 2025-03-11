@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
+import 'package:gestor_gastos/pages/agregar_detalle_page.dart';
 
 class GastosWidget extends StatelessWidget {
   const GastosWidget({
@@ -33,24 +34,24 @@ class GastosWidget extends StatelessWidget {
               child: ExpansionTile(
                 leading: CircleAvatar(
                   backgroundColor: Colors.green,
-                  child: Text(gasto['responsable'][0]+gasto['responsable'][1], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    gasto['responsable'][0] + gasto['responsable'][1],
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
                 ),
                 title: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [Text(gasto['nombre'] ?? 'Sin Nombre', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))],
                 ),
                 subtitle: Text.rich(
-                              TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: '${gasto['responsable']} ',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  const TextSpan(text: '• '),
-                                  TextSpan(text: 'Monto: \$${gasto['precio'] ?? 0.0}'),
-                                ],
-                              ),
-                            ),
+                  TextSpan(
+                    children: [
+                      TextSpan(text: '${gasto['responsable']} ', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const TextSpan(text: '• '),
+                      TextSpan(text: 'Monto: \$${gasto['precio'] ?? 0.0}'),
+                    ],
+                  ),
+                ),
                 trailing: PopupMenuButton<String>(
                   onSelected: (value) {
                     switch (value) {
@@ -78,13 +79,30 @@ class GastosWidget extends StatelessWidget {
                 ),
                 children:
                     subGastos.isNotEmpty
-                        ? subGastos.map((subgasto) {
+                        ? subGastos.asMap().entries.map((entry) {
+                          int subGastoIndex = entry.key; // Índice del subgasto
+                          Map<String, dynamic> subgasto = entry.value;
+
                           return Slidable(
                             endActionPane: ActionPane(
                               motion: const DrawerMotion(),
                               children: [
                                 SlidableAction(
-                                  onPressed: (context) => onEditarGasto(index),
+                                  onPressed: (context) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (context) => AgregarDetallePage(
+                                              gastoExistente: {...subgasto, 'esSubGasto': true, 'subGastoIndex': subGastoIndex},
+                                              gastoIndex: index,
+                                              esSubGasto: true,
+                                              responsables: gastosProvider.responsables,
+                                              onAgregarResponsable: gastosProvider.agregarResponsable,
+                                            ),
+                                      ),
+                                    );
+                                  },
                                   backgroundColor: Colors.blue,
                                   foregroundColor: Colors.white,
                                   icon: Icons.edit,
@@ -93,7 +111,7 @@ class GastosWidget extends StatelessWidget {
                                   autoClose: true,
                                 ),
                                 SlidableAction(
-                                  onPressed: (context) => gastosProvider.eliminarSubGasto(index, subGastos.indexOf(subgasto)),
+                                  onPressed: (context) => gastosProvider.eliminarSubGasto(index, subGastoIndex),
                                   backgroundColor: Colors.red,
                                   foregroundColor: Colors.white,
                                   icon: Icons.delete,
@@ -105,46 +123,34 @@ class GastosWidget extends StatelessWidget {
                             ),
                             child: GestureDetector(
                               onLongPress: () {
-                                showModalBottomSheet(
-                                  context: context,
-                                  builder: (context) {
-                                    return Wrap(
-                                      children: [
-                                        ListTile(
-                                          leading: const Icon(Icons.edit),
-                                          title: const Text('Editar'),
-                                          onTap: () {
-                                            Navigator.pop(context);
-                                            onEditarGasto(index);
-                                          },
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => AgregarDetallePage(
+                                          gastoExistente: {...subgasto, 'esSubGasto': true, 'subGastoIndex': subGastoIndex},
+                                          gastoIndex: index,
+                                          esSubGasto: true,
+                                          responsables: gastosProvider.responsables,
+                                          onAgregarResponsable: gastosProvider.agregarResponsable,
                                         ),
-                                        ListTile(
-                                          leading: const Icon(Icons.delete, color: Colors.red),
-                                          title: const Text('Eliminar'),
-                                          onTap: () {
-                                            Navigator.pop(context);
-                                            gastosProvider.eliminarSubGasto(index, subGastos.indexOf(subgasto));
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  },
+                                  ),
                                 );
                               },
                               child: ListTile(
                                 tileColor: Colors.blue[50],
                                 leading: CircleAvatar(
                                   backgroundColor: Colors.blue,
-                                  child: Text(subgasto['responsable'][0]+subgasto['responsable'][1], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  child: Text(
+                                    subgasto['responsable'][0] + subgasto['responsable'][1],
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                                 title: Text(subgasto['nombre'] ?? 'Sin Detalle', style: const TextStyle(fontWeight: FontWeight.bold)),
                                 subtitle: Text.rich(
                                   TextSpan(
                                     children: [
-                                      TextSpan(
-                                        text: '${subgasto['responsable']}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold), // Negrita para el responsable
-                                      ),
+                                      TextSpan(text: '${subgasto['responsable']}', style: const TextStyle(fontWeight: FontWeight.bold)),
                                       const TextSpan(text: ' • '),
                                       TextSpan(text: 'Monto: \$${subgasto['precio'] ?? 0.0}'),
                                     ],

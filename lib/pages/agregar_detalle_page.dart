@@ -28,6 +28,7 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
   late TextEditingController _precioController;
   String? responsable;
   String? _errorMensaje;
+  int? _subGastoIndex; // Nueva variable para el índice del subgasto
 
   @override
   void initState() {
@@ -35,6 +36,7 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
     _nombreController = TextEditingController(text: widget.gastoExistente?['nombre'] ?? '');
     _precioController = TextEditingController(text: widget.gastoExistente?['precio']?.toString() ?? '');
     responsable = widget.gastoExistente?['responsable'];
+    _subGastoIndex = widget.gastoExistente?['subGastoIndex']; // Obtener el índice del subgasto
   }
 
   @override
@@ -50,8 +52,16 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
 
     if (widget.esSubGasto && widget.gastoIndex != null) {
       final gastoPadre = gastosProvider.gastos[widget.gastoIndex!];
-      final double totalSubGastos =
-          gastoPadre['subGastos'].fold<double>(0.0, (double sum, dynamic item) => sum + ((item['precio'] ?? 0.0).toDouble())) + precioIngresado;
+      double totalSubGastos = 0.0;
+
+      // Calcular el total de subgastos excluyendo el subgasto que se está editando
+      for (int i = 0; i < gastoPadre['subGastos'].length; i++) {
+        if (i != _subGastoIndex) {
+          // Excluir el subgasto actual si se está editando
+          totalSubGastos += (gastoPadre['subGastos'][i]['precio'] ?? 0.0).toDouble();
+        }
+      }
+      totalSubGastos += precioIngresado;
 
       final double totalGastoPrincipal = gastoPadre['precio'] ?? 0.0;
 
@@ -71,7 +81,13 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
       };
 
       if (widget.esSubGasto && widget.gastoIndex != null) {
-        gastosProvider.agregarSubGasto(widget.gastoIndex!, nuevoGasto);
+        if (_subGastoIndex != null) {
+          // Editar subgasto existente
+          gastosProvider.editarSubGasto(widget.gastoIndex!, _subGastoIndex!, nuevoGasto);
+        } else {
+          // Agregar nuevo subgasto
+          gastosProvider.agregarSubGasto(widget.gastoIndex!, nuevoGasto);
+        }
       } else if (widget.gastoExistente != null && widget.gastoIndex != null) {
         gastosProvider.editarGasto(widget.gastoIndex!, nuevoGasto);
       } else {
@@ -136,92 +152,84 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
       ),
     );
   }
-void _mostrarDialogoNuevoResponsable(BuildContext context) {
-  TextEditingController controller = TextEditingController();
-  List<String> responsablesFiltrados = List.from(widget.responsables);
 
-  showDialog(
-    context: context,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setStateDialog) {
-          return AlertDialog(
-            title: const Text('Seleccionar o Agregar Responsable'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(
-                      labelText: 'Buscar o Crear Responsable',
-                      prefixIcon: Icon(Icons.search),
+  void _mostrarDialogoNuevoResponsable(BuildContext context) {
+    TextEditingController controller = TextEditingController();
+    List<String> responsablesFiltrados = List.from(widget.responsables);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Seleccionar o Agregar Responsable'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: controller,
+                      decoration: const InputDecoration(labelText: 'Buscar o Crear Responsable', prefixIcon: Icon(Icons.search)),
+                      onChanged: (query) {
+                        setStateDialog(() {
+                          responsablesFiltrados =
+                              widget.responsables.where((responsable) => responsable.toLowerCase().contains(query.toLowerCase())).toList();
+                        });
+                      },
                     ),
-                    onChanged: (query) {
-                      setStateDialog(() {
-                        responsablesFiltrados = widget.responsables
-                            .where((responsable) => responsable
-                                .toLowerCase()
-                                .contains(query.toLowerCase()))
-                            .toList();
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    height: 200,
-                    child: responsablesFiltrados.isNotEmpty
-                        ? ListView.builder(
-                            itemCount: responsablesFiltrados.length,
-                            itemBuilder: (context, index) {
-                              return ListTile(
-                                title: Text(responsablesFiltrados[index]),
-                                onTap: () {
-                                  setState(() {
-                                    responsable = responsablesFiltrados[index];
-                                  });
-                                  Navigator.pop(context);
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 200,
+                      child:
+                          responsablesFiltrados.isNotEmpty
+                              ? ListView.builder(
+                                itemCount: responsablesFiltrados.length,
+                                itemBuilder: (context, index) {
+                                  return ListTile(
+                                    title: Text(responsablesFiltrados[index]),
+                                    onTap: () {
+                                      setState(() {
+                                        responsable = responsablesFiltrados[index];
+                                      });
+                                      Navigator.pop(context);
+                                    },
+                                  );
                                 },
-                              );
-                            },
-                          )
-                        : const Center(child: Text('No hay resultados')),
-                  ),
-                ],
+                              )
+                              : const Center(child: Text('No hay resultados')),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancelar'),
-              ),
-              TextButton(
-                onPressed: () {
-                  if (controller.text.isNotEmpty) {
-                    // 🔥 Add the new responsible person
-                    widget.onAgregarResponsable(controller.text);
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+                TextButton(
+                  onPressed: () {
+                    if (controller.text.isNotEmpty) {
+                      // 🔥 Add the new responsible person
+                      widget.onAgregarResponsable(controller.text);
 
-                    // 🔥 Ensure "nuevo" is NEVER the selected value
-                    setState(() {
-                      responsable = controller.text;
-                    });
+                      // 🔥 Ensure "nuevo" is NEVER the selected value
+                      setState(() {
+                        responsable = controller.text;
+                      });
 
-                    // 🔥 Force UI update in parent widget
-                    Navigator.pop(context);
-                    Future.delayed(Duration(milliseconds: 100), () {
-                      setState(() {}); // Refresh UI to reflect new responsible person
-                    });
-                  }
-                },
-                child: const Text('Agregar y Asignar'),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
-}
-
+                      // 🔥 Force UI update in parent widget
+                      Navigator.pop(context);
+                      Future.delayed(Duration(milliseconds: 100), () {
+                        setState(() {}); // Refresh UI to reflect new responsible person
+                      });
+                    }
+                  },
+                  child: const Text('Agregar y Asignar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 }

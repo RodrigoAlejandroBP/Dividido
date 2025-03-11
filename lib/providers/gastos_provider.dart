@@ -15,10 +15,7 @@ class GastosProvider extends ChangeNotifier {
   }
 
   void editarGasto(int index, Map<String, dynamic> gastoEditado) {
-    _gastos[index] = {
-      ...gastoEditado,
-      'subGastos': List<Map<String, dynamic>>.from(_gastos[index]['subGastos'])
-    };
+    _gastos[index] = {...gastoEditado, 'subGastos': List<Map<String, dynamic>>.from(_gastos[index]['subGastos'])};
     notifyListeners();
   }
 
@@ -29,19 +26,19 @@ class GastosProvider extends ChangeNotifier {
 
   void agregarSubGasto(int gastoIndex, Map<String, dynamic> subGasto) {
     _gastos[gastoIndex]['subGastos'].add(subGasto);
-    _gastos[gastoIndex] = {
-      ..._gastos[gastoIndex],
-      'subGastos': List<Map<String, dynamic>>.from(_gastos[gastoIndex]['subGastos'])
-    };
+    _gastos[gastoIndex] = {..._gastos[gastoIndex], 'subGastos': List<Map<String, dynamic>>.from(_gastos[gastoIndex]['subGastos'])};
     notifyListeners();
   }
 
   void eliminarSubGasto(int gastoIndex, int subGastoIndex) {
     _gastos[gastoIndex]['subGastos'].removeAt(subGastoIndex);
-    _gastos[gastoIndex] = {
-      ..._gastos[gastoIndex],
-      'subGastos': List<Map<String, dynamic>>.from(_gastos[gastoIndex]['subGastos'])
-    };
+    _gastos[gastoIndex] = {..._gastos[gastoIndex], 'subGastos': List<Map<String, dynamic>>.from(_gastos[gastoIndex]['subGastos'])};
+    notifyListeners();
+  }
+
+  void editarSubGasto(int gastoIndex, int subGastoIndex, Map<String, dynamic> subGastoEditado) {
+    _gastos[gastoIndex]['subGastos'][subGastoIndex] = subGastoEditado;
+    _gastos[gastoIndex] = {..._gastos[gastoIndex], 'subGastos': List<Map<String, dynamic>>.from(_gastos[gastoIndex]['subGastos'])};
     notifyListeners();
   }
 
