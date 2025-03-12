@@ -2,14 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
 import 'package:gestor_gastos/widgets/gastos_widget.dart';
-import 'package:gestor_gastos/widgets/responsables_widget.dart';
 import 'package:gestor_gastos/pages/agregar_detalle_page.dart';
 import 'package:gestor_gastos/pages/resumen_gasto_page.dart';
-import 'package:gestor_gastos/pages/resumen_mensual_page.dart'; // Nuevo import
+import 'package:gestor_gastos/pages/resumen_mensual_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.title});
   final String title;
+
+  @override
+  _HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Forzar reconstrucción después de que los datos base estén cargados
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(() {});
+      print('HomePage: Forzando reconstrucción inicial');
+    });
+  }
 
   void _navegarAAgregarDetalle(BuildContext context, {int? gastoIndex, bool esSubGasto = false}) {
     final gastosProvider = Provider.of<GastosProvider>(context, listen: false);
@@ -39,66 +55,44 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  void _verResumenMensual(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ResumenMensualPage()),
-    );
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final List<Widget> _pages = [
+      GastosWidget(
+        onEditarGasto: (index) => _navegarAAgregarDetalle(context, gastoIndex: index),
+        onEliminarGasto: Provider.of<GastosProvider>(context, listen: false).eliminarGasto,
+        onAgregarSubGasto: (index) => _navegarAAgregarDetalle(context, gastoIndex: index, esSubGasto: true),
+        onVerResumen: (index) => _verResumen(context, index),
+      ),
+      const ResumenMensualPage(),
+    ];
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(title),
+        title: Text(widget.title),
       ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.blue),
-              child: Text('Menú', style: TextStyle(color: Colors.white, fontSize: 24)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.money),
-              title: const Text('Gastos'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.calendar_today),
-              title: const Text('Resumen Mensual'),
-              onTap: () {
-                Navigator.pop(context);
-                _verResumenMensual(context);
-              },
-            ),
-            Consumer<GastosProvider>(
-              builder: (context, gastosProvider, child) {
-                return ResponsablesWidget(
-                  responsables: gastosProvider.responsables,
-                  onAgregarResponsable: gastosProvider.agregarResponsable,
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-      body: Consumer<GastosProvider>(
-        builder: (context, gastosProvider, child) {
-          return GastosWidget(
-            onEditarGasto: (index) => _navegarAAgregarDetalle(context, gastoIndex: index),
-            onEliminarGasto: gastosProvider.eliminarGasto,
-            onAgregarSubGasto: (index) => _navegarAAgregarDetalle(context, gastoIndex: index, esSubGasto: true),
-            onVerResumen: (index) => _verResumen(context, index),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _navegarAAgregarDetalle(context),
-        tooltip: 'Agregar Gasto',
-        child: const Icon(Icons.add),
+      body: _pages[_selectedIndex],
+      floatingActionButton: _selectedIndex == 0
+          ? FloatingActionButton(
+              onPressed: () => _navegarAAgregarDetalle(context),
+              tooltip: 'Agregar Gasto',
+              child: const Icon(Icons.add),
+            )
+          : null,
+      bottomNavigationBar: BottomNavigationBar(
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.money), label: 'Gastos'),
+          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Mensual'),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.orange,
+        onTap: _onItemTapped,
       ),
     );
   }

@@ -4,8 +4,71 @@ class GastosProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _gastos = [];
   List<String> _responsables = [];
 
+  GastosProvider() {
+    _agregarDatosBase();
+    notifyListeners(); // Notifica después de cargar los datos base
+  }
+
   List<Map<String, dynamic>> get gastos => _gastos;
   List<String> get responsables => _responsables;
+
+  void _agregarDatosBase() {
+    agregarGasto({
+      'precio': 1000.0,
+      'fecha': DateTime(2025, 2, 15),
+      'responsable': 'Ana',
+    });
+    agregarSubGasto(0, {
+      'precio': 600.0,
+      'responsable': 'Ana',
+      'descripcion': 'Comida',
+      'esIndividual': true,
+    });
+    agregarSubGasto(0, {
+      'precio': 400.0,
+      'responsable': 'Ana',
+      'descripcion': 'Transporte',
+      'esIndividual': true,
+    });
+
+    agregarGasto({
+      'precio': 500.0,
+      'fecha': DateTime(2025, 3, 10),
+      'responsable': 'Juan',
+    });
+    agregarSubGasto(1, {
+      'precio': 300.0,
+      'responsable': 'Juan',
+      'descripcion': 'Materiales',
+      'esIndividual': true,
+    });
+    agregarSubGasto(1, {
+      'precio': 200.0,
+      'responsable': 'Juan',
+      'descripcion': 'Otros',
+      'esIndividual': true,
+    });
+
+    agregarGasto({
+      'precio': 1200.0,
+      'fecha': DateTime(2025, 4, 1),
+      'responsable': 'Ana',
+    });
+    agregarSubGasto(2, {
+      'precio': 600.0,
+      'responsable': 'Ana',
+      'descripcion': 'Alquiler',
+      'esIndividual': false,
+    });
+    agregarSubGasto(2, {
+      'precio': 300.0,
+      'responsable': 'Juan',
+      'descripcion': 'Servicios',
+      'esIndividual': false,
+    });
+
+    _responsables.addAll(['Ana', 'Juan']);
+  }
 
   void agregarGasto(Map<String, dynamic> gasto) {
     _gastos.add({
@@ -35,7 +98,7 @@ class GastosProvider extends ChangeNotifier {
   void agregarSubGasto(int gastoIndex, Map<String, dynamic> subGasto) {
     _gastos[gastoIndex]['subGastos'].add({
       ...subGasto,
-      'esIndividual': subGasto['esIndividual'] ?? false, // Por defecto no individual
+      'esIndividual': subGasto['esIndividual'] ?? false,
     });
     notifyListeners();
   }
