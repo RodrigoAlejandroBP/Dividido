@@ -221,21 +221,69 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
 
     double totalRango = 0.0;
     Map<String, double> totalPorResponsableConsolidado = {};
-    Map<String, List<Map<String, dynamic>>> subgastosPorResponsable = {};
+    Map<String, Map<Map<String, dynamic>, List<Map<String, dynamic>>>> subgastosPorResponsable = {};
     Set<String> todosResponsables = {};
+
     for (var gasto in gastosDelRango) {
       totalRango += double.parse(gasto['precio'].toString());
       Map<String, double> totalPorResponsable = gastosProvider.calcularTotalPorResponsable(gasto);
+      final subgastos = (gasto['subGastos'] as List<dynamic>?)?.map((item) => item as Map<String, dynamic>).toList() ?? [];
+      double totalSubgastosIndividuales = 0.0;
+      Set<String> responsablesDelGasto = totalPorResponsable.keys.toSet();
+
+      // Calcular total de subgastos individuales
+      for (var subgasto in subgastos) {
+        final esIndividual = subgasto['esIndividual'] as bool? ?? false;
+        if (esIndividual) {
+          totalSubgastosIndividuales += subgasto['precio'] as double;
+        }
+      }
+
+      // Calcular el monto restante del gasto principal (no cubierto por subgastos individuales)
+      double totalGastoComun = gasto['precio'] as double;
+      for (var subgasto in subgastos) {
+        final esIndividual = subgasto['esIndividual'] as bool? ?? false;
+        totalGastoComun -= esIndividual ? (subgasto['precio'] as double) : 0.0;
+      }
+      final montoRestantePorResponsable = totalGastoComun / responsablesDelGasto.length;
+
       totalPorResponsable.forEach((responsable, monto) {
         totalPorResponsableConsolidado[responsable] = (totalPorResponsableConsolidado[responsable] ?? 0) + monto;
         todosResponsables.add(responsable);
-        subgastosPorResponsable.putIfAbsent(responsable, () => []);
-        final subgastos = (gasto['subGastos'] as List<dynamic>?)?.map((item) => item as Map<String, dynamic>).toList() ?? [];
+        subgastosPorResponsable.putIfAbsent(responsable, () => {});
+
+        // Agrupar subgastos por gasto primario
+        final gastoKey = gasto; // Usamos el propio gasto como clave para agrupar
+        subgastosPorResponsable[responsable]!.putIfAbsent(gastoKey, () => []);
+
+        // Agregar subgastos explícitos solo si tienen un monto mayor a 0 para este responsable
         for (var subgasto in subgastos) {
-          subgastosPorResponsable[responsable]!.add({
-            'descripcion': subgasto['descripcion'] ?? 'Sin descripción',
-            'monto': subgasto['precio'] ?? 0.0,
+          final esIndividual = subgasto['esIndividual'] as bool? ?? false;
+          double montoSubgasto;
+          if (esIndividual) {
+            montoSubgasto = subgasto['responsable'] == responsable ? (subgasto['precio'] as double) : 0.0;
+          } else {
+            montoSubgasto = (subgasto['precio'] as double) / responsablesDelGasto.length;
+          }
+          if (montoSubgasto > 0) {
+            subgastosPorResponsable[responsable]![gastoKey]!.add({
+              'descripcion': subgasto['descripcion'] ?? 'Sin descripción',
+              'monto': montoSubgasto,
+              'fecha': gasto['fecha'],
+              'esIndividual': esIndividual,
+              'responsableSubgasto': subgasto['responsable'],
+            });
+          }
+        }
+
+        // Agregar el monto restante como un "subgasto implícito" si es mayor a 0
+        if (montoRestantePorResponsable > 0) {
+          subgastosPorResponsable[responsable]![gastoKey]!.add({
+            'descripcion': 'Parte del gasto principal',
+            'monto': montoRestantePorResponsable,
             'fecha': gasto['fecha'],
+            'esIndividual': false,
+            'responsableSubgasto': 'Compartido',
           });
         }
       });
@@ -344,21 +392,35 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
                 children: totalesFiltrados.entries.map((entry) {
                   final responsable = entry.key;
                   final total = entry.value;
-                  final subgastos = subgastosPorResponsable[responsable] ?? [];
+                  final subgastosPorGasto = subgastosPorResponsable[responsable] ?? {};
                   return ExpansionTile(
-                    key: Key('responsable-$responsable'), // Añadido aquí
+                    key: Key('responsable-$responsable'),
                     leading: CircleAvatar(
                       backgroundColor: Colors.orange[300],
                       child: Text(responsable.isNotEmpty ? responsable[0] : '?', style: const TextStyle(color: Colors.white)),
                     ),
                     title: Text(responsable),
                     subtitle: Text('Total: \$${total.toStringAsFixed(2)}'),
-                    children: subgastos.isNotEmpty
-                        ? subgastos.map((subgasto) {
-                            return ListTile(
-                              title: Text(subgasto['descripcion'] as String? ?? 'Sin descripción'),
-                              subtitle: Text('Fecha: ${DateFormat('dd/MM/yyyy').format(subgasto['fecha'] as DateTime)}'),
-                              trailing: Text('\$${subgasto['monto'].toStringAsFixed(2)}'),
+                    children: subgastosPorGasto.entries.isNotEmpty
+                        ? subgastosPorGasto.entries.map((gastoEntry) {
+                            final gastoPrimario = gastoEntry.key;
+                            final subgastos = gastoEntry.value;
+                            return ExpansionTile(
+                              title: Text(gastoPrimario['nombre'] ?? 'Sin nombre'),
+                              subtitle: Text(
+                                'Total Gasto: \$${gastoPrimario['precio'].toStringAsFixed(2)} | '
+                                'Responsable: ${gastoPrimario['responsable']}',
+                              ),
+                              children: subgastos.map((subgasto) {
+                                return ListTile(
+                                  title: Text(subgasto['descripcion'] as String? ?? 'Sin descripción'),
+                                  subtitle: Text(
+                                    'Fecha: ${DateFormat('dd/MM/yyyy').format(subgasto['fecha'] as DateTime)} '
+                                    '(${subgasto['esIndividual'] ? 'Individual' : 'Compartido'}, ${subgasto['responsableSubgasto']})',
+                                  ),
+                                  trailing: Text('\$${subgasto['monto'].toStringAsFixed(2)}'),
+                                );
+                              }).toList(),
                             );
                           }).toList()
                         : [const ListTile(title: Text('No hay subgastos disponibles'))],

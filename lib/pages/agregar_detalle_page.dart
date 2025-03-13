@@ -26,22 +26,24 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nombreController;
   late TextEditingController _precioController;
-  late TextEditingController _etiquetasController; // Nuevo controlador para etiquetas
+  late TextEditingController _etiquetasController;
   String? responsable;
   String? _errorMensaje;
   int? _subGastoIndex;
   double? _montoDisponible;
-  DateTime? _fechaSeleccionada; // Nueva variable para la fecha
+  DateTime? _fechaSeleccionada;
+  bool _esIndividual = false; // Nuevo campo para subgastos
 
   @override
   void initState() {
     super.initState();
-    _nombreController = TextEditingController(text: widget.gastoExistente?['nombre'] ?? '');
+    _nombreController = TextEditingController(text: widget.gastoExistente?['nombre'] ?? widget.gastoExistente?['descripcion'] ?? '');
     _precioController = TextEditingController(text: widget.gastoExistente?['precio']?.toString() ?? '');
     _etiquetasController = TextEditingController(text: widget.gastoExistente?['etiquetas']?.join(', ') ?? '');
-    responsable = widget.gastoExistente?['responsable'];
+    responsable = widget.gastoExistente?['responsable'] ?? widget.responsables.firstOrNull;
     _subGastoIndex = widget.gastoExistente?['subGastoIndex'];
     _fechaSeleccionada = widget.gastoExistente?['fecha'] ?? DateTime.now();
+    _esIndividual = widget.gastoExistente?['esIndividual'] ?? false; // Inicializar para subgastos
     _calcularMontoDisponible();
   }
 
@@ -108,21 +110,27 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
       Map<String, dynamic> nuevoGasto = {
         'nombre': _nombreController.text,
         'precio': precioIngresado,
-        'responsable': responsable ?? gastosProvider.gastos[widget.gastoIndex!]['responsable'],
-        'fecha': _fechaSeleccionada, // Guardar la fecha seleccionada
-        'etiquetas': _etiquetasController.text.split(',').map((e) => e.trim()).toList(), // Convertir texto a lista
+        'responsable': responsable!,
+        'fecha': _fechaSeleccionada,
+        'etiquetas': _etiquetasController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
       };
 
-      if (widget.esSubGasto && widget.gastoIndex != null) {
-        if (_subGastoIndex != null) {
-          gastosProvider.editarSubGasto(widget.gastoIndex!, _subGastoIndex!, nuevoGasto);
-        } else {
-          gastosProvider.agregarSubGasto(widget.gastoIndex!, nuevoGasto);
+      if (widget.esSubGasto) {
+        nuevoGasto['descripcion'] = _nombreController.text; // Usar 'descripcion' para subgastos
+        nuevoGasto['esIndividual'] = _esIndividual; // Agregar esIndividual para subgastos
+        if (widget.gastoIndex != null) {
+          if (_subGastoIndex != null) {
+            gastosProvider.editarSubGasto(widget.gastoIndex!, _subGastoIndex!, nuevoGasto);
+          } else {
+            gastosProvider.agregarSubGasto(widget.gastoIndex!, nuevoGasto);
+          }
         }
-      } else if (widget.gastoExistente != null && widget.gastoIndex != null) {
-        gastosProvider.editarGasto(widget.gastoIndex!, nuevoGasto);
       } else {
-        gastosProvider.agregarGasto(nuevoGasto);
+        if (widget.gastoExistente != null && widget.gastoIndex != null) {
+          gastosProvider.editarGasto(widget.gastoIndex!, nuevoGasto);
+        } else {
+          gastosProvider.agregarGasto(nuevoGasto);
+        }
       }
 
       Navigator.pop(context);
@@ -149,77 +157,93 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
       appBar: AppBar(
         title: Text(
           widget.esSubGasto
-              ? 'Agregar Subgasto'
+              ? (_subGastoIndex != null ? 'Editar Subgasto' : 'Agregar Subgasto')
               : widget.gastoExistente != null
-              ? 'Editar Gasto'
-              : 'Agregar Gasto',
+                  ? 'Editar Gasto'
+                  : 'Agregar Gasto',
         ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          child: Column(
-            children: [
-              if (widget.esSubGasto && _montoDisponible != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Text(
-                    'Monto disponible: \$${_montoDisponible!.toStringAsFixed(2)}',
-                    style: TextStyle(color: _montoDisponible! < 0 ? Colors.red : Colors.green, fontWeight: FontWeight.bold),
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                if (widget.esSubGasto && _montoDisponible != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Text(
+                      'Monto disponible: \$${_montoDisponible!.toStringAsFixed(2)}',
+                      style: TextStyle(color: _montoDisponible! < 0 ? Colors.red : Colors.green, fontWeight: FontWeight.bold),
+                    ),
                   ),
-                ),
-              TextFormField(
-                controller: _nombreController,
-                decoration: const InputDecoration(labelText: 'Nombre'),
-                validator: (value) => value!.isEmpty ? 'Campo obligatorio' : null,
-              ),
-              TextFormField(
-                controller: _precioController,
-                decoration: InputDecoration(labelText: 'Precio', errorText: _errorMensaje),
-                keyboardType: TextInputType.number,
-                validator: (value) => (value!.isEmpty || double.tryParse(value) == null) ? 'Ingrese un número válido' : null,
-                onChanged: (value) => _calcularMontoDisponible(),
-              ),
-              if (!widget.esSubGasto) // Solo para gastos principales
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Fecha: ${_fechaSeleccionada != null ? "${_fechaSeleccionada!.day}/${_fechaSeleccionada!.month}/${_fechaSeleccionada!.year}" : "No seleccionada"}',
-                        ),
-                      ),
-                      ElevatedButton(onPressed: () => _seleccionarFecha(context), child: const Text('Seleccionar Fecha')),
-                    ],
-                  ),
-                ),
-              if (!widget.esSubGasto) // Solo para gastos principales
                 TextFormField(
-                  controller: _etiquetasController,
-                  decoration: const InputDecoration(labelText: 'Etiquetas (separadas por comas)', hintText: 'Ej: Comida, Transporte'),
+                  controller: _nombreController,
+                  decoration: InputDecoration(labelText: widget.esSubGasto ? 'Descripción' : 'Nombre'),
+                  validator: (value) => value!.isEmpty ? 'Campo obligatorio' : null,
                 ),
-              DropdownButtonFormField<String>(
-                value: responsable,
-                items: [
-                  ...widget.responsables.map((e) => DropdownMenuItem(value: e, child: Text(e))),
-                  const DropdownMenuItem(value: 'nuevo', child: Text('➕ Agregar Nuevo Responsable')),
-                ],
-                onChanged: (value) {
-                  if (value == 'nuevo') {
-                    _mostrarDialogoNuevoResponsable(context);
-                  } else {
-                    setState(() {
-                      responsable = value;
-                    });
-                  }
-                },
-                decoration: const InputDecoration(labelText: 'Responsable'),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(onPressed: () => _validarYGuardar(context), child: Text(widget.esSubGasto ? 'Guardar Subgasto' : 'Guardar Gasto')),
-            ],
+                TextFormField(
+                  controller: _precioController,
+                  decoration: InputDecoration(labelText: 'Precio', errorText: _errorMensaje),
+                  keyboardType: TextInputType.number,
+                  validator: (value) => (value!.isEmpty || double.tryParse(value) == null) ? 'Ingrese un número válido' : null,
+                  onChanged: (value) => _calcularMontoDisponible(),
+                ),
+                if (!widget.esSubGasto) // Solo para gastos principales
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Fecha: ${_fechaSeleccionada != null ? "${_fechaSeleccionada!.day}/${_fechaSeleccionada!.month}/${_fechaSeleccionada!.year}" : "No seleccionada"}',
+                          ),
+                        ),
+                        ElevatedButton(onPressed: () => _seleccionarFecha(context), child: const Text('Seleccionar Fecha')),
+                      ],
+                    ),
+                  ),
+                if (!widget.esSubGasto) // Solo para gastos principales
+                  TextFormField(
+                    controller: _etiquetasController,
+                    decoration: const InputDecoration(labelText: 'Etiquetas (separadas por comas)', hintText: 'Ej: Comida, Transporte'),
+                  ),
+                DropdownButtonFormField<String>(
+                  value: responsable,
+                  items: [
+                    ...widget.responsables.map((e) => DropdownMenuItem(value: e, child: Text(e))),
+                    const DropdownMenuItem(value: 'nuevo', child: Text('➕ Agregar Nuevo Responsable')),
+                  ],
+                  onChanged: (value) {
+                    if (value == 'nuevo') {
+                      _mostrarDialogoNuevoResponsable(context);
+                    } else {
+                      setState(() {
+                        responsable = value;
+                      });
+                    }
+                  },
+                  decoration: const InputDecoration(labelText: 'Responsable'),
+                  validator: (value) => value == null ? 'Seleccione un responsable' : null,
+                ),
+                if (widget.esSubGasto) // Solo para subgastos
+                  SwitchListTile(
+                    title: const Text('Gasto Individual'),
+                    value: _esIndividual,
+                    onChanged: (value) {
+                      setState(() {
+                        _esIndividual = value;
+                      });
+                    },
+                  ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () => _validarYGuardar(context),
+                  child: Text(widget.esSubGasto ? 'Guardar Subgasto' : 'Guardar Gasto'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -247,31 +271,31 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                       decoration: const InputDecoration(labelText: 'Buscar o Crear Responsable', prefixIcon: Icon(Icons.search)),
                       onChanged: (query) {
                         setStateDialog(() {
-                          responsablesFiltrados =
-                              widget.responsables.where((responsable) => responsable.toLowerCase().contains(query.toLowerCase())).toList();
+                          responsablesFiltrados = widget.responsables
+                              .where((responsable) => responsable.toLowerCase().contains(query.toLowerCase()))
+                              .toList();
                         });
                       },
                     ),
                     const SizedBox(height: 10),
                     SizedBox(
                       height: 200,
-                      child:
-                          responsablesFiltrados.isNotEmpty
-                              ? ListView.builder(
-                                itemCount: responsablesFiltrados.length,
-                                itemBuilder: (context, index) {
-                                  return ListTile(
-                                    title: Text(responsablesFiltrados[index]),
-                                    onTap: () {
-                                      setState(() {
-                                        responsable = responsablesFiltrados[index];
-                                      });
-                                      Navigator.pop(context);
-                                    },
-                                  );
-                                },
-                              )
-                              : const Center(child: Text('No hay resultados')),
+                      child: responsablesFiltrados.isNotEmpty
+                          ? ListView.builder(
+                              itemCount: responsablesFiltrados.length,
+                              itemBuilder: (context, index) {
+                                return ListTile(
+                                  title: Text(responsablesFiltrados[index]),
+                                  onTap: () {
+                                    setState(() {
+                                      responsable = responsablesFiltrados[index];
+                                    });
+                                    Navigator.pop(context);
+                                  },
+                                );
+                              },
+                            )
+                          : const Center(child: Text('No hay resultados')),
                     ),
                   ],
                 ),
@@ -281,19 +305,18 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                 TextButton(
                   onPressed: () {
                     if (controller.text.isNotEmpty && controller.text.length >= 2) {
-                      // Validación de longitud mínima
                       widget.onAgregarResponsable(controller.text);
                       setState(() {
                         responsable = controller.text;
                       });
                       Navigator.pop(context);
-                      Future.delayed(Duration(milliseconds: 100), () {
+                      Future.delayed(const Duration(milliseconds: 100), () {
                         setState(() {});
                       });
                     } else {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(const SnackBar(content: Text('El nombre del responsable debe tener al menos 2 caracteres')));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('El nombre del responsable debe tener al menos 2 caracteres')),
+                      );
                     }
                   },
                   child: const Text('Agregar y Asignar'),

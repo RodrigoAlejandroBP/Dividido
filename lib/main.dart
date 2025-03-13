@@ -7,6 +7,8 @@ import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  
   await initializeDateFormatting('es', null); // Inicializa datos de localización para intl
   runApp(
     MultiProvider(
@@ -26,7 +28,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Gestor de Gastos',
       theme: ThemeData(
-        primarySwatch: Colors.orange,
+        primarySwatch: Colors.blue,
         cardTheme: CardTheme(
           elevation: 4,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -38,7 +40,7 @@ class MyApp extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           elevation: 0,
           centerTitle: true,
-          backgroundColor: Colors.orange,
+          backgroundColor: Colors.blueAccent,
         ),
       ),
       localizationsDelegates: const [

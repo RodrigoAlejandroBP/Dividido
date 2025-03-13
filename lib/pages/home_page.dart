@@ -20,7 +20,6 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // Forzar reconstrucción después de que los datos base estén cargados
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() {});
       print('HomePage: Forzando reconstrucción inicial');
