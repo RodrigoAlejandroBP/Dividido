@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:gestor_gastos/providers/gastos_provider.dart';
-import 'package:gestor_gastos/pages/agregar_detalle_page.dart';
 import 'package:gestor_gastos/widgets/menu_opciones.dart';
 import 'package:gestor_gastos/widgets/subgasto_item.dart';
+import 'package:gestor_gastos/models/gasto_model.dart';
 
 class GastoItem extends StatelessWidget {
-  final Map<String, dynamic> gasto;
+  final Gasto gasto;
   final int index;
   final void Function(int) onEditarGasto;
   final void Function(int) onEliminarGasto;
@@ -26,9 +23,8 @@ class GastoItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var subGastos = (gasto['subGastos'] as List)
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    // Aseguramos que subGastos sea una lista de SubGasto
+    List<SubGasto> subGastos = gasto.subGastos?.cast<SubGasto>() ?? [];
 
     return Card(
       elevation: 4,
@@ -36,20 +32,24 @@ class GastoItem extends StatelessWidget {
       child: ExpansionTile(
         leading: CircleAvatar(
           backgroundColor: Colors.green,
-          child: Text(gasto['responsable'][0] + gasto['responsable'][1],
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          child: Text(
+            gasto.responsable != null && gasto.responsable!.length >= 2
+                ? gasto.responsable!.substring(0, 2)
+                : gasto.responsable ?? '?',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
         ),
-        title: Text(gasto['nombre'] ?? 'Sin Nombre',
+        title: Text(gasto.nombre ?? 'Sin Nombre',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         subtitle: Text.rich(
           TextSpan(
             children: [
               TextSpan(
-                text: '${gasto['responsable']}',
+                text: '${gasto.responsable ?? 'Desconocido'}',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const TextSpan(text: ' • '),
-              TextSpan(text: 'Monto: \$${gasto['precio'] ?? 0.0}'),
+              TextSpan(text: 'Monto: \$${gasto.precio}'),
             ],
           ),
         ),
@@ -80,7 +80,7 @@ class GastoItem extends StatelessWidget {
         children: subGastos.isNotEmpty
             ? subGastos.asMap().entries.map((entry) {
                 int subGastoIndex = entry.key;
-                Map<String, dynamic> subgasto = entry.value;
+                SubGasto subgasto = entry.value; // Ahora es seguro que es SubGasto
                 return SubGastoItem(
                   subgasto: subgasto,
                   gastoIndex: index,

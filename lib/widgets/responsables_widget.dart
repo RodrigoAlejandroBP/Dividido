@@ -9,11 +9,11 @@ class ResponsablesWidget extends StatefulWidget {
   const ResponsablesWidget({super.key, required this.responsables, required this.onAgregarResponsable});
 
   @override
-  _ResponsablesWidgetState createState() => _ResponsablesWidgetState();
+  State<ResponsablesWidget> createState() => _ResponsablesWidgetState();
 }
 
 class _ResponsablesWidgetState extends State<ResponsablesWidget> {
-  TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   List<String> _filteredResponsables = [];
 
   @override
@@ -61,7 +61,7 @@ class _ResponsablesWidgetState extends State<ResponsablesWidget> {
         ),
         if (_filteredResponsables.isNotEmpty)
           SizedBox(
-            height: 200, // Altura fija para evitar que la lista crezca demasiado
+            height: 200,
             child: Scrollbar(
               child: ListView(
                 shrinkWrap: true,

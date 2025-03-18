@@ -3,9 +3,10 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
 import 'package:gestor_gastos/pages/agregar_detalle_page.dart';
+import 'package:gestor_gastos/models/gasto_model.dart';
 
 class SubGastoItem extends StatelessWidget {
-  final Map<String, dynamic> subgasto;
+  final SubGasto subgasto;
   final int gastoIndex;
   final int subGastoIndex;
 
@@ -13,19 +14,18 @@ class SubGastoItem extends StatelessWidget {
 
   void _editarSubGasto(BuildContext context) {
     print('Editando subgasto en gastoIndex: $gastoIndex, subGastoIndex: $subGastoIndex');
-    
+
     final gastosProvider = Provider.of<GastosProvider>(context, listen: false);
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (context) => AgregarDetallePage(
-              gastoExistente: {...subgasto, 'esSubGasto': true, 'subGastoIndex': subGastoIndex},
-              gastoIndex: gastoIndex,
-              esSubGasto: true,
-              responsables: gastosProvider.responsables,
-              onAgregarResponsable: gastosProvider.agregarResponsable,
-            ),
+        builder: (context) => AgregarDetallePage(
+          gastoExistente: subgasto,
+          gastoIndex: gastoIndex,
+          esSubGasto: true,
+          responsables: gastosProvider.responsables,
+          onAgregarResponsable: gastosProvider.agregarResponsable,
+        ),
       ),
     ).then((_) {
       gastosProvider.notifyListeners();
@@ -61,17 +61,20 @@ class SubGastoItem extends StatelessWidget {
           ],
         ),
         child: ListTile(
-          onTap: () => _editarSubGasto(context), // Permitir edición también al tocar el ListTile
+          onTap: () => _editarSubGasto(context),
           tileColor: Colors.blue[50],
           leading: CircleAvatar(
             backgroundColor: Colors.blue,
             child: Text(
-              subgasto['responsable'][0] + (subgasto['responsable'].length > 1 ? subgasto['responsable'][1] : ''),
+              subgasto.responsable != null && subgasto.responsable!.length > 1
+                  ? subgasto.responsable!.substring(0, 2)
+                  : subgasto.responsable ?? '',
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),
-          title: Text(subgasto['nombre'] ?? 'Sin Detalle', style: const TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text('Monto: \$${subgasto['precio'] ?? 0.0}'),
+          title: Text(subgasto.descripcion ?? 'Sin Detalle',
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text('Monto: \$${subgasto.precio}'),
         ),
       ),
     );

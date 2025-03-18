@@ -1,32 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
+import 'package:gestor_gastos/models/gasto_model.dart';
 
 class ResumenGastoPage extends StatefulWidget {
-  final Map<String, dynamic> gasto;
+  final Gasto gasto;
 
   const ResumenGastoPage({super.key, required this.gasto});
 
   @override
-  _ResumenGastoPageState createState() => _ResumenGastoPageState();
+  State<ResumenGastoPage> createState() => _ResumenGastoPageState();
 }
 
 class _ResumenGastoPageState extends State<ResumenGastoPage> {
   @override
   Widget build(BuildContext context) {
     final gastosProvider = Provider.of<GastosProvider>(context, listen: false);
-    double totalPrecio = double.parse(widget.gasto['precio'].toString());
-    final subGastos = (widget.gasto['subGastos'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+    double totalPrecio = widget.gasto.precio;
+    final subGastos = widget.gasto.subGastos ?? [];
     int gastoIndex = gastosProvider.gastos.indexOf(widget.gasto);
 
     Map<String, double> totalPorResponsable = gastosProvider.calcularTotalPorResponsable(widget.gasto);
-    Map<String, List<Map<String, dynamic>>> subgastosPorResponsable = {};
+    Map<String, List<SubGasto>> subgastosPorResponsable = {};
     for (var subGasto in subGastos) {
-      String responsableSubGasto = subGasto['responsable'] as String;
+      String responsableSubGasto = subGasto.responsable ?? 'Desconocido';
       subgastosPorResponsable.putIfAbsent(responsableSubGasto, () => []).add(subGasto);
     }
-    subgastosPorResponsable[widget.gasto['responsable'] as String] ??= [];
+    subgastosPorResponsable[widget.gasto.responsable ?? 'Desconocido'] ??= [];
 
     return Scaffold(
       appBar: AppBar(title: const Text('Resumen del Gasto')),
@@ -44,9 +44,12 @@ class _ResumenGastoPageState extends State<ResumenGastoPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Gasto Principal: ${widget.gasto['nombre']}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                Text('Responsable: ${widget.gasto['responsable'] ?? 'Desconocido'}', style: const TextStyle(fontSize: 14, color: Colors.white70)),
-                Text('Precio Total: \$${totalPrecio.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, color: Colors.white)),
+                Text('Gasto Principal: ${widget.gasto.nombre ?? 'Sin Nombre'}',
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                Text('Responsable: ${widget.gasto.responsable ?? 'Desconocido'}',
+                    style: const TextStyle(fontSize: 14, color: Colors.white70)),
+                Text('Precio Total: \$${totalPrecio.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 16, color: Colors.white)),
               ],
             ),
           ),
@@ -65,33 +68,42 @@ class _ResumenGastoPageState extends State<ResumenGastoPage> {
                       ),
                     ),
                     title: Text(entry.key),
-                    trailing: Text('\$${entry.value.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    trailing: Text('\$${entry.value.toStringAsFixed(2)}',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
                     dense: true,
                     children: subgastosPorResponsable[entry.key]?.map((subgasto) {
-                      int subGastoIndex = subGastos.indexOf(subgasto);
-                      return ListTile(
-                        title: Text(subgasto['nombre'] ?? 'Sin Detalle', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text.rich(
-                          TextSpan(
-                            children: [
-                              const TextSpan(text: ' • '),
-                              TextSpan(text: 'Monto: \$${subgasto['precio'] ?? 0.0}'),
-                            ],
-                          ),
-                        ),
-                        trailing: Checkbox(
-                          value: subgasto['esIndividual'] as bool? ?? false,
-                          activeColor: Colors.green,
-                          checkColor: Colors.white,
-                          onChanged: (bool? value) {
-                            setState(() {
-                              Map<String, dynamic> subGastoActualizado = {...subgasto, 'esIndividual': value ?? false};
-                              gastosProvider.editarSubGasto(gastoIndex, subGastoIndex, subGastoActualizado);
-                            });
-                          },
-                        ),
-                      );
-                    }).toList() ?? [],
+                          int subGastoIndex = subGastos.indexOf(subgasto);
+                          return ListTile(
+                            title: Text(subgasto.descripcion ?? 'Sin Detalle',
+                                style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text.rich(
+                              TextSpan(
+                                children: [
+                                  const TextSpan(text: ' • '),
+                                  TextSpan(text: 'Monto: \$${subgasto.precio}'),
+                                ],
+                              ),
+                            ),
+                            trailing: Checkbox(
+                              value: subgasto.esIndividual ?? false,
+                              activeColor: Colors.green,
+                              checkColor: Colors.white,
+                              onChanged: (bool? value) {
+                                setState(() {
+                                  final subGastoActualizado = SubGasto(
+                                    id: subgasto.id,
+                                    descripcion: subgasto.descripcion,
+                                    precio: subgasto.precio,
+                                    esIndividual: value ?? false,
+                                    responsable: subgasto.responsable,
+                                  );
+                                  gastosProvider.editarSubGasto(gastoIndex, subGastoIndex, subGastoActualizado);
+                                });
+                              },
+                            ),
+                          );
+                        }).toList() ??
+                        [],
                   ),
                 );
               }).toList(),

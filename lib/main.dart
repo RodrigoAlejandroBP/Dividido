@@ -3,13 +3,30 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
 import 'package:gestor_gastos/pages/home_page.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import '/models/gasto_model.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  
-  await initializeDateFormatting('es', null); // Inicializa datos de localización para intl
+  // Inicializar Hive
+  await Hive.initFlutter();
+  Hive.registerAdapter(GastoAdapter());
+  Hive.registerAdapter(SubGastoAdapter());
+  await Hive.openBox<Gasto>('gastosBox'); // Caja para gastos
+  await Hive.openBox('syncQueue'); // Caja para cola de sincronización
+
+  // Inicializar Supabase
+  await Supabase.initialize(
+    url: 'https://kqkgkutjrbwifvpyzvrt.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtxa2drdXRqcmJ3aWZ2cHl6dnJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyNjU1MTQsImV4cCI6MjA1Nzg0MTUxNH0._iluaVC3D3jyFgRAz0Zo8zyZUoHeju9r1vlT6E15Lf4',
+  );
+
+  // Inicializar formato de fechas en español
+  await initializeDateFormatting('es', null);
+
   runApp(
     MultiProvider(
       providers: [
@@ -48,9 +65,7 @@ class MyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('es'),
-      ],
+      supportedLocales: const [Locale('es')],
       locale: const Locale('es'),
       home: const HomePage(title: 'Gestor de Gastos'),
     );

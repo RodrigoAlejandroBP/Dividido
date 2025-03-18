@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
+import 'package:gestor_gastos/models/gasto_model.dart';
 import 'package:intl/intl.dart';
 
 class ResumenMensualPage extends StatefulWidget {
   const ResumenMensualPage({super.key});
 
   @override
-  _ResumenMensualPageState createState() => _ResumenMensualPageState();
+  State<ResumenMensualPage> createState() => _ResumenMensualPageState();
 }
 
 class _ResumenMensualPageState extends State<ResumenMensualPage> {
@@ -60,9 +61,8 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
                           child: DropdownButton<int>(
                             value: selectedStartDate?.month ?? now.month,
                             items: List.generate(12, (index) => index + 1)
-                                .map(
-                                  (month) => DropdownMenuItem(value: month, child: Text(DateFormat('MMMM', 'es').format(DateTime(2023, month)))),
-                                )
+                                .map((month) =>
+                                    DropdownMenuItem(value: month, child: Text(DateFormat('MMMM', 'es').format(DateTime(2023, month)))))
                                 .toList(),
                             onChanged: (value) {
                               setStateDialog(() {
@@ -96,9 +96,8 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
                           child: DropdownButton<int>(
                             value: selectedEndDate?.month ?? now.month,
                             items: List.generate(12, (index) => index + 1)
-                                .map(
-                                  (month) => DropdownMenuItem(value: month, child: Text(DateFormat('MMMM', 'es').format(DateTime(2023, month)))),
-                                )
+                                .map((month) =>
+                                    DropdownMenuItem(value: month, child: Text(DateFormat('MMMM', 'es').format(DateTime(2023, month)))))
                                 .toList(),
                             onChanged: (value) {
                               setStateDialog(() {
@@ -143,7 +142,7 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
   @override
   Widget build(BuildContext context) {
     final gastosProvider = Provider.of<GastosProvider>(context);
-    final gastos = gastosProvider.gastos;
+    final List<Gasto> gastos = gastosProvider.gastos;
     final bool hayGastos = gastos.isNotEmpty;
 
     if (!hayGastos) {
@@ -186,9 +185,9 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
     }
 
     // Agrupar gastos por mes
-    Map<String, List<Map<String, dynamic>>> gastosPorMes = {};
+    Map<String, List<Gasto>> gastosPorMes = {};
     for (var gasto in gastos) {
-      final fecha = gasto['fecha'] as DateTime;
+      final fecha = gasto.fecha;
       final mesAnio = DateFormat('M/yyyy').format(fecha);
       gastosPorMes.putIfAbsent(mesAnio, () => []).add(gasto);
     }
@@ -204,7 +203,7 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
     // Filtrar gastos por rango de fechas
     final startKey = _startDate != null ? DateFormat('M/yyyy').format(_startDate!) : null;
     final endKey = _endDate != null ? DateFormat('M/yyyy').format(_endDate!) : null;
-    List<Map<String, dynamic>> gastosDelRango = [];
+    List<Gasto> gastosDelRango = [];
     if (startKey != null && endKey != null) {
       final startDate = _startDate!;
       final endDate = _endDate!;
@@ -213,7 +212,8 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
         final mes = int.parse(partes[0]);
         final anio = int.parse(partes[1]);
         final fechaMes = DateTime(anio, mes);
-        if (fechaMes.isAfter(startDate.subtract(const Duration(days: 1))) && fechaMes.isBefore(endDate.add(const Duration(days: 1)))) {
+        if (fechaMes.isAfter(startDate.subtract(const Duration(days: 1))) &&
+            fechaMes.isBefore(endDate.add(const Duration(days: 1)))) {
           gastosDelRango.addAll(listaGastos);
         }
       });
@@ -221,29 +221,29 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
 
     double totalRango = 0.0;
     Map<String, double> totalPorResponsableConsolidado = {};
-    Map<String, Map<Map<String, dynamic>, List<Map<String, dynamic>>>> subgastosPorResponsable = {};
+    Map<String, Map<Gasto, List<Map<String, dynamic>>>> subgastosPorResponsable = {};
     Set<String> todosResponsables = {};
 
     for (var gasto in gastosDelRango) {
-      totalRango += double.parse(gasto['precio'].toString());
+      totalRango += gasto.precio;
       Map<String, double> totalPorResponsable = gastosProvider.calcularTotalPorResponsable(gasto);
-      final subgastos = (gasto['subGastos'] as List<dynamic>?)?.map((item) => item as Map<String, dynamic>).toList() ?? [];
+      final subgastos = gasto.subGastos ?? [];
       double totalSubgastosIndividuales = 0.0;
       Set<String> responsablesDelGasto = totalPorResponsable.keys.toSet();
 
       // Calcular total de subgastos individuales
       for (var subgasto in subgastos) {
-        final esIndividual = subgasto['esIndividual'] as bool? ?? false;
+        final esIndividual = subgasto.esIndividual ?? false;
         if (esIndividual) {
-          totalSubgastosIndividuales += subgasto['precio'] as double;
+          totalSubgastosIndividuales += subgasto.precio;
         }
       }
 
       // Calcular el monto restante del gasto principal (no cubierto por subgastos individuales)
-      double totalGastoComun = gasto['precio'] as double;
+      double totalGastoComun = gasto.precio;
       for (var subgasto in subgastos) {
-        final esIndividual = subgasto['esIndividual'] as bool? ?? false;
-        totalGastoComun -= esIndividual ? (subgasto['precio'] as double) : 0.0;
+        final esIndividual = subgasto.esIndividual ?? false;
+        totalGastoComun -= esIndividual ? subgasto.precio : 0.0;
       }
       final montoRestantePorResponsable = totalGastoComun / responsablesDelGasto.length;
 
@@ -253,35 +253,34 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
         subgastosPorResponsable.putIfAbsent(responsable, () => {});
 
         // Agrupar subgastos por gasto primario
-        final gastoKey = gasto; // Usamos el propio gasto como clave para agrupar
-        subgastosPorResponsable[responsable]!.putIfAbsent(gastoKey, () => []);
+        subgastosPorResponsable[responsable]!.putIfAbsent(gasto, () => []);
 
         // Agregar subgastos explícitos solo si tienen un monto mayor a 0 para este responsable
         for (var subgasto in subgastos) {
-          final esIndividual = subgasto['esIndividual'] as bool? ?? false;
+          final esIndividual = subgasto.esIndividual ?? false;
           double montoSubgasto;
           if (esIndividual) {
-            montoSubgasto = subgasto['responsable'] == responsable ? (subgasto['precio'] as double) : 0.0;
+            montoSubgasto = subgasto.responsable == responsable ? subgasto.precio : 0.0;
           } else {
-            montoSubgasto = (subgasto['precio'] as double) / responsablesDelGasto.length;
+            montoSubgasto = subgasto.precio / responsablesDelGasto.length;
           }
           if (montoSubgasto > 0) {
-            subgastosPorResponsable[responsable]![gastoKey]!.add({
-              'descripcion': subgasto['descripcion'] ?? 'Sin descripción',
+            subgastosPorResponsable[responsable]![gasto]!.add({
+              'descripcion': subgasto.descripcion ?? 'Sin descripción',
               'monto': montoSubgasto,
-              'fecha': gasto['fecha'],
+              'fecha': gasto.fecha,
               'esIndividual': esIndividual,
-              'responsableSubgasto': subgasto['responsable'],
+              'responsableSubgasto': subgasto.responsable,
             });
           }
         }
 
         // Agregar el monto restante como un "subgasto implícito" si es mayor a 0
         if (montoRestantePorResponsable > 0) {
-          subgastosPorResponsable[responsable]![gastoKey]!.add({
+          subgastosPorResponsable[responsable]![gasto]!.add({
             'descripcion': 'Parte del gasto principal',
             'monto': montoRestantePorResponsable,
-            'fecha': gasto['fecha'],
+            'fecha': gasto.fecha,
             'esIndividual': false,
             'responsableSubgasto': 'Compartido',
           });
@@ -321,7 +320,8 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('${_formatMesAnio(_startDate)} - ${_formatMesAnio(_endDate)}', style: const TextStyle(fontSize: 16)),
+                          Text('${_formatMesAnio(_startDate)} - ${_formatMesAnio(_endDate)}',
+                              style: const TextStyle(fontSize: 16)),
                           const Icon(Icons.calendar_today, color: Colors.orange),
                         ],
                       ),
@@ -363,15 +363,13 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
                 child: PieChart(
                   PieChartData(
                     sections: totalesFiltrados.entries
-                        .map(
-                          (e) => PieChartSectionData(
-                            value: e.value,
-                            title: '${e.key[0]}\n\$${e.value.toStringAsFixed(2)}',
-                            color: _getColorForResponsable(e.key),
-                            radius: 60,
-                            titleStyle: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
-                          ),
-                        )
+                        .map((e) => PieChartSectionData(
+                              value: e.value,
+                              title: '${e.key[0]}\n\$${e.value.toStringAsFixed(2)}',
+                              color: _getColorForResponsable(e.key),
+                              radius: 60,
+                              titleStyle: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
+                            ))
                         .toList(),
                     sectionsSpace: 2,
                     centerSpaceRadius: 40,
@@ -397,7 +395,8 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
                     key: Key('responsable-$responsable'),
                     leading: CircleAvatar(
                       backgroundColor: Colors.orange[300],
-                      child: Text(responsable.isNotEmpty ? responsable[0] : '?', style: const TextStyle(color: Colors.white)),
+                      child: Text(responsable.isNotEmpty ? responsable[0] : '?',
+                          style: const TextStyle(color: Colors.white)),
                     ),
                     title: Text(responsable),
                     subtitle: Text('Total: \$${total.toStringAsFixed(2)}'),
@@ -406,10 +405,10 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
                             final gastoPrimario = gastoEntry.key;
                             final subgastos = gastoEntry.value;
                             return ExpansionTile(
-                              title: Text(gastoPrimario['nombre'] ?? 'Sin nombre'),
+                              title: Text(gastoPrimario.nombre ?? 'Sin nombre'),
                               subtitle: Text(
-                                'Total Gasto: \$${gastoPrimario['precio'].toStringAsFixed(2)} | '
-                                'Responsable: ${gastoPrimario['responsable']}',
+                                'Total Gasto: \$${gastoPrimario.precio.toStringAsFixed(2)} | '
+                                'Responsable: ${gastoPrimario.responsable ?? 'Desconocido'}',
                               ),
                               children: subgastos.map((subgasto) {
                                 return ListTile(

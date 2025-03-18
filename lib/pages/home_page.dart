@@ -11,7 +11,7 @@ class HomePage extends StatefulWidget {
   final String title;
 
   @override
-  _HomePageState createState() => _HomePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
@@ -62,7 +62,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> _pages = [
+    final List<Widget> pages = [
       GastosWidget(
         onEditarGasto: (index) => _navegarAAgregarDetalle(context, gastoIndex: index),
         onEliminarGasto: Provider.of<GastosProvider>(context, listen: false).eliminarGasto,
@@ -76,7 +76,7 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: _pages[_selectedIndex],
+      body: pages[_selectedIndex],
       floatingActionButton: _selectedIndex == 0
           ? FloatingActionButton(
               onPressed: () => _navegarAAgregarDetalle(context),

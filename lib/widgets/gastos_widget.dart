@@ -4,6 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
 import 'package:gestor_gastos/pages/agregar_detalle_page.dart';
+import 'package:gestor_gastos/models/gasto_model.dart';
 
 class GastosWidget extends StatelessWidget {
   const GastosWidget({
@@ -32,7 +33,7 @@ class GastosWidget extends StatelessWidget {
           itemCount: gastosProvider.gastos.length,
           itemBuilder: (context, index) {
             var gasto = gastosProvider.gastos[index];
-            var subGastos = (gasto['subGastos'] as List).map((e) => Map<String, dynamic>.from(e)).toList();
+            var subGastos = gasto.subGastos ?? [];
 
             return Card(
               elevation: 6,
@@ -41,30 +42,34 @@ class GastosWidget extends StatelessWidget {
                 leading: CircleAvatar(
                   backgroundColor: Colors.green,
                   child: Text(
-                    _getInitials(gasto['responsable']),
+                    _getInitials(gasto.responsable),
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
-                title: Text('Gasto de ${gasto['responsable']}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), // Usar responsable en lugar de nombre
+                title: Text('Gasto de ${gasto.responsable ?? 'Desconocido'}',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 subtitle: Text.rich(
                   TextSpan(
                     children: [
-                      TextSpan(text: '${gasto['responsable']} ', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      TextSpan(
+                          text: '${gasto.responsable ?? 'Desconocido'} ',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
                       const TextSpan(text: '• '),
-                      TextSpan(text: 'Monto: \$${gasto['precio'].toStringAsFixed(2)}'),
+                      TextSpan(text: 'Monto: \$${gasto.precio.toStringAsFixed(2)}'),
                       const TextSpan(text: ' • '),
-                      TextSpan(text: 'Fecha: ${gasto['fecha'].day}/${gasto['fecha'].month}/${gasto['fecha'].year}'),
+                      TextSpan(
+                          text: 'Fecha: ${gasto.fecha.day}/${gasto.fecha.month}/${gasto.fecha.year}'),
                     ],
                   ),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (gasto['etiquetas'].isNotEmpty)
+                    if (gasto.etiquetas != null && gasto.etiquetas!.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(right: 8.0),
                         child: Chip(
-                          label: Text(gasto['etiquetas'][0]),
+                          label: Text(gasto.etiquetas![0]),
                           backgroundColor: Colors.grey[200],
                           padding: const EdgeInsets.all(4),
                         ),
@@ -99,8 +104,8 @@ class GastosWidget extends StatelessWidget {
                   if (subGastos.isNotEmpty) const Divider(),
                   ...subGastos.asMap().entries.map((entry) {
                     int subGastoIndex = entry.key;
-                    Map<String, dynamic> subgasto = entry.value;
-                    bool esIndividual = subgasto['esIndividual'] as bool? ?? false;
+                    SubGasto subgasto = entry.value;
+                    bool esIndividual = subgasto.esIndividual ?? false;
 
                     return Slidable(
                       endActionPane: ActionPane(
@@ -112,7 +117,7 @@ class GastosWidget extends StatelessWidget {
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => AgregarDetallePage(
-                                    gastoExistente: {...subgasto, 'esSubGasto': true, 'subGastoIndex': subGastoIndex},
+                                    gastoExistente: subgasto,
                                     gastoIndex: index,
                                     esSubGasto: true,
                                     responsables: gastosProvider.responsables,
@@ -144,17 +149,20 @@ class GastosWidget extends StatelessWidget {
                         leading: CircleAvatar(
                           backgroundColor: Colors.blue,
                           child: Text(
-                            _getInitials(subgasto['responsable']),
+                            _getInitials(subgasto.responsable),
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                           ),
                         ),
-                        title: Text(subgasto['descripcion'] ?? 'Sin Detalle', style: const TextStyle(fontWeight: FontWeight.bold)), // Usar descripción en subgastos
+                        title: Text(subgasto.descripcion ?? 'Sin Detalle',
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text.rich(
                           TextSpan(
                             children: [
-                              TextSpan(text: '${subgasto['responsable']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              TextSpan(
+                                  text: '${subgasto.responsable ?? 'Desconocido'}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold)),
                               const TextSpan(text: ' • '),
-                              TextSpan(text: 'Monto: \$${subgasto['precio'].toStringAsFixed(2)}'),
+                              TextSpan(text: 'Monto: \$${subgasto.precio.toStringAsFixed(2)}'),
                             ],
                           ),
                         ),
@@ -172,7 +180,7 @@ class GastosWidget extends StatelessWidget {
                         ),
                       ),
                     );
-                  }).toList(),
+                  }),
                   if (subGastos.isEmpty) const ListTile(title: Text('No hay subgastos')),
                 ],
               ),
@@ -183,10 +191,10 @@ class GastosWidget extends StatelessWidget {
     );
   }
 
-  String _getInitials(String responsable) {
-    if (responsable.isEmpty) return '?';
+  String _getInitials(String? responsable) {
+    if (responsable == null || responsable.isEmpty) return '?';
     if (responsable.length == 1) return responsable[0];
-    return responsable[0] + responsable[1];
+    return responsable.substring(0, 2);
   }
 
   PopupMenuItem<String> _buildMenuItem(String value, IconData icon, String text, [Color? color]) {

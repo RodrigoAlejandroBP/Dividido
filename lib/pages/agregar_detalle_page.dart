@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
+import 'package:gestor_gastos/models/gasto_model.dart';
 
 class AgregarDetallePage extends StatefulWidget {
-  final Map<String, dynamic>? gastoExistente;
+  final dynamic gastoExistente; // Puede ser Gasto o SubGasto
   final int? gastoIndex;
   final bool esSubGasto;
   final List<String> responsables;
@@ -19,10 +20,10 @@ class AgregarDetallePage extends StatefulWidget {
   });
 
   @override
-  _AgregarDetallePageState createState() => _AgregarDetallePageState();
+  State<AgregarDetallePage> createState() => AgregarDetallePageState();
 }
 
-class _AgregarDetallePageState extends State<AgregarDetallePage> {
+class AgregarDetallePageState extends State<AgregarDetallePage> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nombreController;
   late TextEditingController _precioController;
@@ -32,18 +33,26 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
   int? _subGastoIndex;
   double? _montoDisponible;
   DateTime? _fechaSeleccionada;
-  bool _esIndividual = false; // Nuevo campo para subgastos
+  bool _esIndividual = false;
 
   @override
   void initState() {
     super.initState();
-    _nombreController = TextEditingController(text: widget.gastoExistente?['nombre'] ?? widget.gastoExistente?['descripcion'] ?? '');
-    _precioController = TextEditingController(text: widget.gastoExistente?['precio']?.toString() ?? '');
-    _etiquetasController = TextEditingController(text: widget.gastoExistente?['etiquetas']?.join(', ') ?? '');
-    responsable = widget.gastoExistente?['responsable'] ?? widget.responsables.firstOrNull;
-    _subGastoIndex = widget.gastoExistente?['subGastoIndex'];
-    _fechaSeleccionada = widget.gastoExistente?['fecha'] ?? DateTime.now();
-    _esIndividual = widget.gastoExistente?['esIndividual'] ?? false; // Inicializar para subgastos
+    if (widget.esSubGasto && widget.gastoExistente is SubGasto) {
+      final subGasto = widget.gastoExistente as SubGasto;
+      _nombreController = TextEditingController(text: subGasto.descripcion ?? '');
+      _precioController = TextEditingController(text: subGasto.precio.toString());
+      _esIndividual = subGasto.esIndividual ?? false;
+      responsable = subGasto.responsable ?? widget.responsables.firstOrNull;
+    } else {
+      final gasto = widget.gastoExistente as Gasto?;
+      _nombreController = TextEditingController(text: gasto?.nombre ?? '');
+      _precioController = TextEditingController(text: gasto?.precio.toString() ?? '');
+      _etiquetasController = TextEditingController(text: gasto?.etiquetas?.join(', ') ?? '');
+      _fechaSeleccionada = gasto?.fecha ?? DateTime.now();
+      responsable = gasto?.responsable ?? widget.responsables.firstOrNull;
+    }
+    _subGastoIndex = widget.gastoIndex;
     _calcularMontoDisponible();
   }
 
@@ -61,15 +70,14 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
       final gastoPadre = gastosProvider.gastos[widget.gastoIndex!];
       double totalSubGastos = 0.0;
 
-      for (int i = 0; i < gastoPadre['subGastos'].length; i++) {
-        if (i != _subGastoIndex) {
-          totalSubGastos += (gastoPadre['subGastos'][i]['precio'] ?? 0.0).toDouble();
+      for (var subGasto in gastoPadre.subGastos ?? []) {
+        if (subGasto.key != _subGastoIndex) {
+          totalSubGastos += subGasto.precio;
         }
       }
 
-      final double totalGastoPrincipal = gastoPadre['precio'] ?? 0.0;
       setState(() {
-        _montoDisponible = totalGastoPrincipal - totalSubGastos;
+        _montoDisponible = gastoPadre.precio - totalSubGastos;
       });
     }
   }
@@ -89,50 +97,56 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
       final gastoPadre = gastosProvider.gastos[widget.gastoIndex!];
       double totalSubGastos = 0.0;
 
-      for (int i = 0; i < gastoPadre['subGastos'].length; i++) {
-        if (i != _subGastoIndex) {
-          totalSubGastos += (gastoPadre['subGastos'][i]['precio'] ?? 0.0).toDouble();
+      for (var subGasto in gastoPadre.subGastos ?? []) {
+        if (subGasto.key != _subGastoIndex) {
+          totalSubGastos += subGasto.precio;
         }
       }
       totalSubGastos += precioIngresado;
 
-      final double totalGastoPrincipal = gastoPadre['precio'] ?? 0.0;
-
-      if (totalSubGastos > totalGastoPrincipal) {
+      if (totalSubGastos > gastoPadre.precio) {
         setState(() {
-          _errorMensaje = 'El total de subgastos no puede superar el gasto principal (\$${totalGastoPrincipal.toStringAsFixed(2)})';
+          _errorMensaje =
+              'El total de subgastos no puede superar el gasto principal (\$${gastoPadre.precio.toStringAsFixed(2)})';
         });
         return;
       }
     }
 
     if (_formKey.currentState!.validate() && responsable != null) {
-      Map<String, dynamic> nuevoGasto = {
-        'nombre': _nombreController.text,
-        'precio': precioIngresado,
-        'responsable': responsable!,
-        'fecha': _fechaSeleccionada,
-        'etiquetas': _etiquetasController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
-      };
-
       if (widget.esSubGasto) {
-        nuevoGasto['descripcion'] = _nombreController.text; // Usar 'descripcion' para subgastos
-        nuevoGasto['esIndividual'] = _esIndividual; // Agregar esIndividual para subgastos
+        final nuevoSubGasto = SubGasto(
+          descripcion: _nombreController.text,
+          precio: precioIngresado,
+          esIndividual: _esIndividual,
+          responsable: responsable!,
+        );
         if (widget.gastoIndex != null) {
           if (_subGastoIndex != null) {
-            gastosProvider.editarSubGasto(widget.gastoIndex!, _subGastoIndex!, nuevoGasto);
+            gastosProvider.editarSubGasto(widget.gastoIndex!, _subGastoIndex!, nuevoSubGasto);
           } else {
-            gastosProvider.agregarSubGasto(widget.gastoIndex!, nuevoGasto);
+            gastosProvider.agregarSubGasto(widget.gastoIndex!, nuevoSubGasto);
           }
         }
       } else {
+        final nuevoGasto = Gasto(
+          nombre: _nombreController.text,
+          precio: precioIngresado,
+          fecha: _fechaSeleccionada!,
+          responsable: responsable!,
+          subGastos: widget.gastoExistente?.subGastos ?? [],
+          etiquetas: _etiquetasController.text
+              .split(',')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList(),
+        );
         if (widget.gastoExistente != null && widget.gastoIndex != null) {
           gastosProvider.editarGasto(widget.gastoIndex!, nuevoGasto);
         } else {
           gastosProvider.agregarGasto(nuevoGasto);
         }
       }
-
       Navigator.pop(context);
     }
   }
@@ -175,22 +189,26 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                     padding: const EdgeInsets.only(bottom: 8.0),
                     child: Text(
                       'Monto disponible: \$${_montoDisponible!.toStringAsFixed(2)}',
-                      style: TextStyle(color: _montoDisponible! < 0 ? Colors.red : Colors.green, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          color: _montoDisponible! < 0 ? Colors.red : Colors.green,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                 TextFormField(
                   controller: _nombreController,
-                  decoration: InputDecoration(labelText: widget.esSubGasto ? 'Descripción' : 'Nombre'),
+                  decoration:
+                      InputDecoration(labelText: widget.esSubGasto ? 'Descripción' : 'Nombre'),
                   validator: (value) => value!.isEmpty ? 'Campo obligatorio' : null,
                 ),
                 TextFormField(
                   controller: _precioController,
                   decoration: InputDecoration(labelText: 'Precio', errorText: _errorMensaje),
                   keyboardType: TextInputType.number,
-                  validator: (value) => (value!.isEmpty || double.tryParse(value) == null) ? 'Ingrese un número válido' : null,
+                  validator: (value) =>
+                      (value!.isEmpty || double.tryParse(value) == null) ? 'Ingrese un número válido' : null,
                   onChanged: (value) => _calcularMontoDisponible(),
                 ),
-                if (!widget.esSubGasto) // Solo para gastos principales
+                if (!widget.esSubGasto)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8.0),
                     child: Row(
@@ -200,19 +218,24 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                             'Fecha: ${_fechaSeleccionada != null ? "${_fechaSeleccionada!.day}/${_fechaSeleccionada!.month}/${_fechaSeleccionada!.year}" : "No seleccionada"}',
                           ),
                         ),
-                        ElevatedButton(onPressed: () => _seleccionarFecha(context), child: const Text('Seleccionar Fecha')),
+                        ElevatedButton(
+                            onPressed: () => _seleccionarFecha(context),
+                            child: const Text('Seleccionar Fecha')),
                       ],
                     ),
                   ),
-                if (!widget.esSubGasto) // Solo para gastos principales
+                if (!widget.esSubGasto)
                   TextFormField(
                     controller: _etiquetasController,
-                    decoration: const InputDecoration(labelText: 'Etiquetas (separadas por comas)', hintText: 'Ej: Comida, Transporte'),
+                    decoration: const InputDecoration(
+                        labelText: 'Etiquetas (separadas por comas)',
+                        hintText: 'Ej: Comida, Transporte'),
                   ),
                 DropdownButtonFormField<String>(
                   value: responsable,
                   items: [
-                    ...widget.responsables.map((e) => DropdownMenuItem(value: e, child: Text(e))),
+                    ...widget.responsables
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e))),
                     const DropdownMenuItem(value: 'nuevo', child: Text('➕ Agregar Nuevo Responsable')),
                   ],
                   onChanged: (value) {
@@ -227,7 +250,7 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                   decoration: const InputDecoration(labelText: 'Responsable'),
                   validator: (value) => value == null ? 'Seleccione un responsable' : null,
                 ),
-                if (widget.esSubGasto) // Solo para subgastos
+                if (widget.esSubGasto)
                   SwitchListTile(
                     title: const Text('Gasto Individual'),
                     value: _esIndividual,
@@ -268,11 +291,13 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                   children: [
                     TextField(
                       controller: controller,
-                      decoration: const InputDecoration(labelText: 'Buscar o Crear Responsable', prefixIcon: Icon(Icons.search)),
+                      decoration: const InputDecoration(
+                          labelText: 'Buscar o Crear Responsable', prefixIcon: Icon(Icons.search)),
                       onChanged: (query) {
                         setStateDialog(() {
                           responsablesFiltrados = widget.responsables
-                              .where((responsable) => responsable.toLowerCase().contains(query.toLowerCase()))
+                              .where((responsable) =>
+                                  responsable.toLowerCase().contains(query.toLowerCase()))
                               .toList();
                         });
                       },
@@ -315,7 +340,8 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
                       });
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('El nombre del responsable debe tener al menos 2 caracteres')),
+                        const SnackBar(
+                            content: Text('El nombre del responsable debe tener al menos 2 caracteres')),
                       );
                     }
                   },
@@ -328,4 +354,8 @@ class _AgregarDetallePageState extends State<AgregarDetallePage> {
       },
     );
   }
+}
+
+extension FirstOrNull<T> on List<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

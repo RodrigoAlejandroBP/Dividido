@@ -17,28 +17,34 @@ class GastoAdapter extends TypeAdapter<Gasto> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return Gasto(
-      nombre: fields[0] as String?,
-      precio: fields[1] as double,
-      fecha: fields[2] as DateTime,
-      responsable: fields[3] as String?,
-      subGastos: (fields[4] as List?)?.cast<SubGasto>(),
+      id: fields[0] as String?,
+      nombre: fields[1] as String?,
+      precio: fields[2] as double,
+      fecha: fields[3] as DateTime,
+      responsable: fields[4] as String?,
+      subGastos: (fields[5] as List?)?.cast<SubGasto>(),
+      etiquetas: (fields[6] as List?)?.cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Gasto obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(7)
       ..writeByte(0)
-      ..write(obj.nombre)
+      ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.precio)
+      ..write(obj.nombre)
       ..writeByte(2)
-      ..write(obj.fecha)
+      ..write(obj.precio)
       ..writeByte(3)
-      ..write(obj.responsable)
+      ..write(obj.fecha)
       ..writeByte(4)
-      ..write(obj.subGastos);
+      ..write(obj.responsable)
+      ..writeByte(5)
+      ..write(obj.subGastos)
+      ..writeByte(6)
+      ..write(obj.etiquetas);
   }
 
   @override
@@ -63,24 +69,27 @@ class SubGastoAdapter extends TypeAdapter<SubGasto> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return SubGasto(
-      descripcion: fields[0] as String?,
-      precio: fields[1] as double,
-      esIndividual: fields[2] as bool?,
-      responsable: fields[3] as String?,
+      id: fields[0] as String?,
+      descripcion: fields[1] as String?,
+      precio: fields[2] as double,
+      esIndividual: fields[3] as bool?,
+      responsable: fields[4] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SubGasto obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(5)
       ..writeByte(0)
-      ..write(obj.descripcion)
+      ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.precio)
+      ..write(obj.descripcion)
       ..writeByte(2)
-      ..write(obj.esIndividual)
+      ..write(obj.precio)
       ..writeByte(3)
+      ..write(obj.esIndividual)
+      ..writeByte(4)
       ..write(obj.responsable);
   }
 
