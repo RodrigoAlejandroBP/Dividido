@@ -142,7 +142,7 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
   @override
   Widget build(BuildContext context) {
     final gastosProvider = Provider.of<GastosProvider>(context);
-    final List<Gasto> gastos = gastosProvider.gastos;
+    final List<Gasto> gastos = gastosProvider.gastos.cast<Gasto>(); // Forzamos el tipado correcto
     final bool hayGastos = gastos.isNotEmpty;
 
     if (!hayGastos) {
@@ -214,7 +214,7 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
         final fechaMes = DateTime(anio, mes);
         if (fechaMes.isAfter(startDate.subtract(const Duration(days: 1))) &&
             fechaMes.isBefore(endDate.add(const Duration(days: 1)))) {
-          gastosDelRango.addAll(listaGastos);
+          gastosDelRango.addAll(listaGastos.cast<Gasto>()); // Corrección aquí
         }
       });
     }

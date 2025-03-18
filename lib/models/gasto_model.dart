@@ -23,17 +23,29 @@ class Gasto extends HiveObject {
   List<SubGasto>? subGastos;
 
   @HiveField(6)
-  List<String>? etiquetas; // Opcional, no requerido
+  List<String>? etiquetas;
 
   Gasto({
     this.id,
     this.nombre,
-    required this.precio,
+    this.precio = 0.0,
     required this.fecha,
     this.responsable,
     this.subGastos,
-    this.etiquetas, // Aseguramos que sea opcional
+    this.etiquetas,
   });
+
+  // Método toJson directamente en la clase
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'nombre': nombre,
+        'precio': precio,
+        'fecha': fecha.toIso8601String(),
+        'responsable': responsable,
+        'subGastos': subGastos?.map((s) => s.toJson()).toList(),
+        'etiquetas': etiquetas,
+        'key': key,
+      };
 }
 
 @HiveType(typeId: 1)
@@ -56,8 +68,18 @@ class SubGasto extends HiveObject {
   SubGasto({
     this.id,
     this.descripcion,
-    required this.precio,
+    this.precio = 0.0,
     this.esIndividual,
     this.responsable,
   });
+
+  // Método toJson directamente en la clase
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'descripcion': descripcion,
+        'precio': precio,
+        'esIndividual': esIndividual,
+        'responsable': responsable,
+        'key': key,
+      };
 }

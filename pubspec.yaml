@@ -43,7 +43,9 @@ dependencies:
   hive_flutter: ^1.1.0
   supabase_flutter: ^1.10.3
   flutter_localizations: # Agregar esta línea
-    sdk: flutter
+      sdk: flutter
+  path_provider: ^2.1.1
+
 
 dev_dependencies:
   flutter_test:
