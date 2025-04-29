@@ -61,8 +61,7 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
                           child: DropdownButton<int>(
                             value: selectedStartDate?.month ?? now.month,
                             items: List.generate(12, (index) => index + 1)
-                                .map((month) =>
-                                    DropdownMenuItem(value: month, child: Text(DateFormat('MMMM', 'es').format(DateTime(2023, month)))))
+                                .map((month) => DropdownMenuItem(value: month, child: Text(DateFormat('MMMM', 'es').format(DateTime(2023, month)))))
                                 .toList(),
                             onChanged: (value) {
                               setStateDialog(() {
@@ -96,8 +95,7 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
                           child: DropdownButton<int>(
                             value: selectedEndDate?.month ?? now.month,
                             items: List.generate(12, (index) => index + 1)
-                                .map((month) =>
-                                    DropdownMenuItem(value: month, child: Text(DateFormat('MMMM', 'es').format(DateTime(2023, month)))))
+                                .map((month) => DropdownMenuItem(value: month, child: Text(DateFormat('MMMM', 'es').format(DateTime(2023, month)))))
                                 .toList(),
                             onChanged: (value) {
                               setStateDialog(() {
@@ -142,7 +140,7 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
   @override
   Widget build(BuildContext context) {
     final gastosProvider = Provider.of<GastosProvider>(context);
-    final List<Gasto> gastos = gastosProvider.gastos.cast<Gasto>(); // Forzamos el tipado correcto
+    final List<Gasto> gastos = gastosProvider.gastos.cast<Gasto>();
     final bool hayGastos = gastos.isNotEmpty;
 
     if (!hayGastos) {
@@ -212,9 +210,8 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
         final mes = int.parse(partes[0]);
         final anio = int.parse(partes[1]);
         final fechaMes = DateTime(anio, mes);
-        if (fechaMes.isAfter(startDate.subtract(const Duration(days: 1))) &&
-            fechaMes.isBefore(endDate.add(const Duration(days: 1)))) {
-          gastosDelRango.addAll(listaGastos.cast<Gasto>()); // Corrección aquí
+        if (fechaMes.isAfter(startDate.subtract(const Duration(days: 1))) && fechaMes.isBefore(endDate.add(const Duration(days: 1)))) {
+          gastosDelRango.addAll(listaGastos.cast<Gasto>());
         }
       });
     }
@@ -223,59 +220,56 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
     Map<String, double> totalPorResponsableConsolidado = {};
     Map<String, Map<Gasto, List<Map<String, dynamic>>>> subgastosPorResponsable = {};
     Set<String> todosResponsables = {};
+    Map<String, double> montoRealmentePagado = {};
 
     for (var gasto in gastosDelRango) {
       totalRango += gasto.precio;
       Map<String, double> totalPorResponsable = gastosProvider.calcularTotalPorResponsable(gasto);
       final subgastos = gasto.subGastos ?? [];
-      double totalSubgastosIndividuales = 0.0;
       Set<String> responsablesDelGasto = totalPorResponsable.keys.toSet();
 
-      // Calcular total de subgastos individuales
+      // Calcular cuánto pagó cada responsable realmente (según subgastos)
       for (var subgasto in subgastos) {
-        final esIndividual = subgasto.esIndividual ?? false;
-        if (esIndividual) {
-          totalSubgastosIndividuales += subgasto.precio;
-        }
+        String responsableSubgasto = subgasto.responsable ?? gasto.responsable ?? 'Desconocido';
+        montoRealmentePagado[responsableSubgasto] = (montoRealmentePagado[responsableSubgasto] ?? 0) + subgasto.precio;
+      }
+      // Calcular el resto del gasto principal
+      double totalSubgastos = subgastos.fold(0.0, (sum, subgasto) => sum + subgasto.precio);
+      double restoGastoPrincipal = gasto.precio - totalSubgastos;
+      if (restoGastoPrincipal > 0) {
+        String responsablePrincipal = gasto.responsable ?? 'Desconocido';
+        montoRealmentePagado[responsablePrincipal] = (montoRealmentePagado[responsablePrincipal] ?? 0) + restoGastoPrincipal;
       }
 
-      // Calcular el monto restante del gasto principal (no cubierto por subgastos individuales)
-      double totalGastoComun = gasto.precio;
-      for (var subgasto in subgastos) {
-        final esIndividual = subgasto.esIndividual ?? false;
-        totalGastoComun -= esIndividual ? subgasto.precio : 0.0;
-      }
-      final montoRestantePorResponsable = totalGastoComun / responsablesDelGasto.length;
+      // Calcular el monto que cada responsable DEBERÍA pagar (equitativamente)
+      double montoEquitativoPorResponsable = gasto.precio / responsablesDelGasto.length;
 
       totalPorResponsable.forEach((responsable, monto) {
-        totalPorResponsableConsolidado[responsable] = (totalPorResponsableConsolidado[responsable] ?? 0) + monto;
+        // Ajustar el total consolidado para que refleje el monto equitativo
+        totalPorResponsableConsolidado[responsable] = (totalPorResponsableConsolidado[responsable] ?? 0) + montoEquitativoPorResponsable;
         todosResponsables.add(responsable);
         subgastosPorResponsable.putIfAbsent(responsable, () => {});
 
-        // Agrupar subgastos por gasto primario
-        subgastosPorResponsable[responsable]!.putIfAbsent(gasto, () => []);
+        // Agrupar subgastos por gasto primario (limpiar primero para evitar acumulación)
+        subgastosPorResponsable[responsable]![gasto] = [];
 
-        // Agregar subgastos explícitos solo si tienen un monto mayor a 0 para este responsable
+        // Agregar subgastos explícitos (todos son compartidos, se dividen equitativamente)
         for (var subgasto in subgastos) {
-          final esIndividual = subgasto.esIndividual ?? false;
-          double montoSubgasto;
-          if (esIndividual) {
-            montoSubgasto = subgasto.responsable == responsable ? subgasto.precio : 0.0;
-          } else {
-            montoSubgasto = subgasto.precio / responsablesDelGasto.length;
-          }
+          double montoSubgasto = subgasto.precio / responsablesDelGasto.length;
           if (montoSubgasto > 0) {
             subgastosPorResponsable[responsable]![gasto]!.add({
               'descripcion': subgasto.descripcion ?? 'Sin descripción',
               'monto': montoSubgasto,
               'fecha': gasto.fecha,
-              'esIndividual': esIndividual,
-              'responsableSubgasto': subgasto.responsable,
+              'esIndividual': false,
+              'responsableSubgasto': subgasto.responsable ?? 'Desconocido',
+              'pagadoPor': subgasto.responsable ?? 'Desconocido',
             });
           }
         }
 
         // Agregar el monto restante como un "subgasto implícito" si es mayor a 0
+        double montoRestantePorResponsable = restoGastoPrincipal / responsablesDelGasto.length;
         if (montoRestantePorResponsable > 0) {
           subgastosPorResponsable[responsable]![gasto]!.add({
             'descripcion': 'Parte del gasto principal',
@@ -283,9 +277,42 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
             'fecha': gasto.fecha,
             'esIndividual': false,
             'responsableSubgasto': 'Compartido',
+            'pagadoPor': gasto.responsable ?? 'Desconocido',
           });
         }
       });
+    }
+
+    // Calcular ajustes (diferencia entre lo pagado y lo que debería pagar)
+    Map<String, double> ajustes = {};
+    totalPorResponsableConsolidado.forEach((responsable, montoDeberiaPagar) {
+      double montoPagado = montoRealmentePagado[responsable] ?? 0;
+      ajustes[responsable] = montoPagado - montoDeberiaPagar;
+    });
+
+    // Calcular saldos entre pares de personas
+    List<Map<String, dynamic>> saldos = [];
+    List<String> responsablesList = todosResponsables.toList();
+    for (int i = 0; i < responsablesList.length; i++) {
+      for (int j = i + 1; j < responsablesList.length; j++) {
+        String persona1 = responsablesList[i];
+        String persona2 = responsablesList[j];
+        double ajuste1 = ajustes[persona1] ?? 0;
+        double ajuste2 = ajustes[persona2] ?? 0;
+
+        if (ajuste1 * ajuste2 >= 0) continue;
+
+        double montoTransferencia = (ajuste1.abs() < ajuste2.abs()) ? ajuste1.abs() : ajuste2.abs();
+        if (ajuste1 > 0 && ajuste2 < 0) {
+          saldos.add({'deudor': persona2, 'acreedor': persona1, 'monto': montoTransferencia});
+          ajustes[persona1] = (ajustes[persona1] ?? 0) - montoTransferencia;
+          ajustes[persona2] = (ajustes[persona2] ?? 0) + montoTransferencia;
+        } else if (ajuste1 < 0 && ajuste2 > 0) {
+          saldos.add({'deudor': persona1, 'acreedor': persona2, 'monto': montoTransferencia});
+          ajustes[persona1] = (ajustes[persona1] ?? 0) + montoTransferencia;
+          ajustes[persona2] = (ajustes[persona2] ?? 0) - montoTransferencia;
+        }
+      }
     }
 
     if (_selectedResponsables.isEmpty && todosResponsables.isNotEmpty) {
@@ -320,8 +347,7 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('${_formatMesAnio(_startDate)} - ${_formatMesAnio(_endDate)}',
-                              style: const TextStyle(fontSize: 16)),
+                          Text('${_formatMesAnio(_startDate)} - ${_formatMesAnio(_endDate)}', style: const TextStyle(fontSize: 16)),
                           const Icon(Icons.calendar_today, color: Colors.orange),
                         ],
                       ),
@@ -395,8 +421,7 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
                     key: Key('responsable-$responsable'),
                     leading: CircleAvatar(
                       backgroundColor: Colors.orange[300],
-                      child: Text(responsable.isNotEmpty ? responsable[0] : '?',
-                          style: const TextStyle(color: Colors.white)),
+                      child: Text(responsable.isNotEmpty ? responsable[0] : '?', style: const TextStyle(color: Colors.white)),
                     ),
                     title: Text(responsable),
                     subtitle: Text('Total: \$${total.toStringAsFixed(2)}'),
@@ -425,6 +450,89 @@ class _ResumenMensualPageState extends State<ResumenMensualPage> {
                         : [const ListTile(title: Text('No hay subgastos disponibles'))],
                   );
                 }).toList(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              elevation: 4,
+              child: ExpansionTile(
+                title: const Text(
+                  'Ajustes y Saldos Finales',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                backgroundColor: Colors.green[50],
+                collapsedBackgroundColor: Colors.green[100],
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Detalles de ajustes:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 8),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            columns: const [
+                              DataColumn(label: Text('Responsable', style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text('Pagado', style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text('Debería Pagar', style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text('Ajuste', style: TextStyle(fontWeight: FontWeight.bold))),
+                            ],
+                            rows: todosResponsables.map((responsable) {
+                              final montoPagado = montoRealmentePagado[responsable] ?? 0;
+                              final montoDeberiaPagar = totalPorResponsableConsolidado[responsable] ?? 0;
+                              final ajuste = ajustes[responsable] ?? 0;
+                              return DataRow(
+                                cells: [
+                                  DataCell(Text(responsable)),
+                                  DataCell(Text('\$${montoPagado.toStringAsFixed(2)}')),
+                                  DataCell(Text('\$${montoDeberiaPagar.toStringAsFixed(2)}')),
+                                  DataCell(Text(
+                                    ajuste >= 0 ? '\$${ajuste.toStringAsFixed(2)}' : '-\$${ajuste.abs().toStringAsFixed(2)}',
+                                    style: TextStyle(color: ajuste >= 0 ? Colors.green : Colors.red),
+                                  )),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Saldos finales:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 8),
+                        if (saldos.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: Text('No hay deudas pendientes. Todos están a mano.', style: TextStyle(fontStyle: FontStyle.italic)),
+                          )
+                        else
+                          Column(
+                            children: saldos.map((saldo) {
+                              return Container(
+                                margin: const EdgeInsets.symmetric(vertical: 4.0),
+                                padding: const EdgeInsets.all(8.0),
+                                decoration: BoxDecoration(
+                                  color: Colors.green[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.green),
+                                ),
+                                child: Text(
+                                  '${saldo['deudor']} le debe \$${saldo['monto'].toStringAsFixed(2)} a ${saldo['acreedor']}.',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

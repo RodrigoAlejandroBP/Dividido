@@ -52,6 +52,12 @@ class AgregarDetallePageState extends State<AgregarDetallePage> {
       _fechaSeleccionada = gasto?.fecha ?? DateTime.now();
       responsable = gasto?.responsable ?? widget.responsables.firstOrNull;
     }
+
+    // Validar que responsable esté en widget.responsables
+    if (responsable != null && !widget.responsables.contains(responsable)) {
+      responsable = widget.responsables.isNotEmpty ? widget.responsables.first : null;
+    }
+
     _subGastoIndex = widget.gastoIndex;
     _calcularMontoDisponible();
   }
@@ -167,6 +173,9 @@ class AgregarDetallePageState extends State<AgregarDetallePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Asegurarse de que los responsables sean únicos
+    final uniqueResponsables = widget.responsables.toSet().toList();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -234,7 +243,7 @@ class AgregarDetallePageState extends State<AgregarDetallePage> {
                 DropdownButtonFormField<String>(
                   value: responsable,
                   items: [
-                    ...widget.responsables
+                    ...uniqueResponsables
                         .map((e) => DropdownMenuItem(value: e, child: Text(e))),
                     const DropdownMenuItem(value: 'nuevo', child: Text('➕ Agregar Nuevo Responsable')),
                   ],
@@ -335,9 +344,6 @@ class AgregarDetallePageState extends State<AgregarDetallePage> {
                         responsable = controller.text;
                       });
                       Navigator.pop(context);
-                      Future.delayed(const Duration(milliseconds: 100), () {
-                        setState(() {});
-                      });
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
