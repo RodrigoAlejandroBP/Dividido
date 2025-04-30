@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:gestor_gastos/widgets/login_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
 import 'package:gestor_gastos/pages/home_page.dart';
@@ -16,20 +17,21 @@ void main() async {
     await Hive.initFlutter();
     Hive.registerAdapter(GastoAdapter());
     Hive.registerAdapter(SubGastoAdapter());
-    await Hive.openBox<Gasto>('gastosBox');
-    await Hive.openBox('syncQueue');
-    await Hive.box('syncQueue').clear();
-    print('Hive inicializado correctamente.');
+    final gastosBox = await Hive.openBox<Gasto>('gastosBox');
+    final syncQueueBox = await Hive.openBox('syncQueue');
+    print('Hive inicializado correctamente. GastosBox isOpen: ${gastosBox.isOpen}, SyncQueueBox isOpen: ${syncQueueBox.isOpen}');
 
-    // Limpieza temporal para pruebas (opcional, descomentar solo si quieres reiniciar datos)
-    // await Hive.box<Gasto>('gastosBox').clear();
-    // await Hive.box('syncQueue').clear();
+    // Limpieza al inicio para pruebas
+    print('Limpiando cajas de Hive...');
+    await gastosBox.clear();
+    await syncQueueBox.clear();
+    print('Cajas de Hive limpiadas. GastosBox length: ${gastosBox.length}, SyncQueueBox length: ${syncQueueBox.length}');
 
     // Inicializar Supabase
     print('Inicializando Supabase...');
     await Supabase.initialize(
-      url: 'https://kqkgkutjrbwifvpyzvrt.supabase.co', // Reemplaza con tu URL de Supabase
-      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtxa2drdXRqcmJ3aWZ2cHl6dnJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyNjU1MTQsImV4cCI6MjA1Nzg0MTUxNH0._iluaVC3D3jyFgRAz0Zo8zyZUoHeju9r1vlT6E15Lf4', // Reemplaza con tu clave anónima
+      url: 'https://kqkgkutjrbwifvpyzvrt.supabase.co',
+      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtxa2drdXRqcmJ3aWZ2cHl6dnJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyNjU1MTQsImV4cCI6MjA1Nzg0MTUxNH0._iluaVC3D3jyFgRAz0Zo8zyZUoHeju9r1vlT6E15Lf4',
     );
     print('Supabase inicializado correctamente.');
 
@@ -41,7 +43,12 @@ void main() async {
     runApp(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => GastosProvider()),
+          ChangeNotifierProvider(
+            create: (_) {
+              print('Creando GastosProvider...');
+              return GastosProvider();
+            },
+          ),
         ],
         child: const MyApp(),
       ),
@@ -59,6 +66,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Gestor de Gastos',
+      initialRoute: Supabase.instance.client.auth.currentUser == null ? '/login' : '/home',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         cardTheme: CardTheme(
@@ -82,7 +90,11 @@ class MyApp extends StatelessWidget {
       ],
       supportedLocales: const [Locale('es')],
       locale: const Locale('es'),
-      home: const HomePage(title: 'Gestor de Gastos'),
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/home': (context) => const  HomePage(title: 'Gestor de Gastos'), // Tu pantalla principal
+      },
+
     );
   }
 }

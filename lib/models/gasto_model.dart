@@ -33,19 +33,24 @@ class Gasto extends HiveObject {
     this.responsable,
     this.subGastos,
     this.etiquetas,
-  });
+  }) {
+    subGastos ??= [];
+    etiquetas ??= [];
+  }
 
-  // Método toJson directamente en la clase
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'nombre': nombre,
-        'precio': precio,
-        'fecha': fecha.toIso8601String(),
-        'responsable': responsable,
-        'subGastos': subGastos?.map((s) => s.toJson()).toList(),
-        'etiquetas': etiquetas,
-        'key': key,
-      };
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{
+      'nombre': nombre,
+      'precio': precio,
+      'fecha': fecha.toIso8601String(),
+      'responsable': responsable,
+      'etiquetas': etiquetas,
+    };
+    if (id != null) {
+      map['id'] = id;
+    }
+    return map;
+  }
 }
 
 @HiveType(typeId: 1)
@@ -65,21 +70,28 @@ class SubGasto extends HiveObject {
   @HiveField(4)
   String? responsable;
 
+  @HiveField(5)
+  int? key;
+
   SubGasto({
     this.id,
     this.descripcion,
     this.precio = 0.0,
-    this.esIndividual,
+    this.esIndividual = false,
     this.responsable,
+    this.key,
   });
 
-  // Método toJson directamente en la clase
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'descripcion': descripcion,
-        'precio': precio,
-        'esIndividual': esIndividual,
-        'responsable': responsable,
-        'key': key,
-      };
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{
+      'descripcion': descripcion,
+      'precio': precio,
+      // 'esIndividual' removed to match Supabase schema
+      'responsable': responsable,
+    };
+    if (id != null) {
+      map['id'] = id;
+    }
+    return map;
+  }
 }

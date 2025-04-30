@@ -74,13 +74,14 @@ class SubGastoAdapter extends TypeAdapter<SubGasto> {
       precio: fields[2] as double,
       esIndividual: fields[3] as bool?,
       responsable: fields[4] as String?,
+      key: fields[5] as int?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SubGasto obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -90,7 +91,9 @@ class SubGastoAdapter extends TypeAdapter<SubGasto> {
       ..writeByte(3)
       ..write(obj.esIndividual)
       ..writeByte(4)
-      ..write(obj.responsable);
+      ..write(obj.responsable)
+      ..writeByte(5)
+      ..write(obj.key);
   }
 
   @override

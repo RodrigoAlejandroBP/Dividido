@@ -20,10 +20,8 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() {});
-      print('HomePage: Forzando reconstrucción inicial');
-    });
+    // Removed unnecessary setState to prevent duplicate rebuilds
+    print('HomePage: Inicializando...');
   }
 
   void _navegarAAgregarDetalle(BuildContext context, {int? gastoIndex, bool esSubGasto = false}) {

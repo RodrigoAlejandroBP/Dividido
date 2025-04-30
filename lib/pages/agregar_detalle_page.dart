@@ -34,6 +34,7 @@ class AgregarDetallePageState extends State<AgregarDetallePage> {
   double? _montoDisponible;
   DateTime? _fechaSeleccionada;
   bool _esIndividual = false;
+  double? _precioOriginal; // Guardar el precio original del subgasto
 
   @override
   void initState() {
@@ -42,6 +43,8 @@ class AgregarDetallePageState extends State<AgregarDetallePage> {
       final subGasto = widget.gastoExistente as SubGasto;
       _nombreController = TextEditingController(text: subGasto.descripcion ?? '');
       _precioController = TextEditingController(text: subGasto.precio.toString());
+      _etiquetasController = TextEditingController(); // Inicializar aunque no se use
+      _precioOriginal = subGasto.precio;
       _esIndividual = subGasto.esIndividual ?? false;
       responsable = subGasto.responsable ?? widget.responsables.firstOrNull;
     } else {
@@ -108,14 +111,18 @@ class AgregarDetallePageState extends State<AgregarDetallePage> {
           totalSubGastos += subGasto.precio;
         }
       }
-      totalSubGastos += precioIngresado;
 
-      if (totalSubGastos > gastoPadre.precio) {
-        setState(() {
-          _errorMensaje =
-              'El total de subgastos no puede superar el gasto principal (\$${gastoPadre.precio.toStringAsFixed(2)})';
-        });
-        return;
+      // Solo validar el total si el precio ha cambiado
+      if (_subGastoIndex != null && precioIngresado != _precioOriginal) {
+        totalSubGastos += precioIngresado;
+
+        if (totalSubGastos > gastoPadre.precio) {
+          setState(() {
+            _errorMensaje =
+                'El total de subgastos no puede superar el gasto principal (\$${gastoPadre.precio.toStringAsFixed(2)})';
+          });
+          return;
+        }
       }
     }
 
