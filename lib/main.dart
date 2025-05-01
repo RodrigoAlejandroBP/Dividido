@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:gestor_gastos/widgets/login_screen.dart';
+import 'package:gestor_gastos/widgets/signup_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
 import 'package:gestor_gastos/pages/home_page.dart';
@@ -92,6 +93,7 @@ class MyApp extends StatelessWidget {
       locale: const Locale('es'),
       routes: {
         '/login': (context) => const LoginScreen(),
+        '/signup': (context) => const SignUpScreen(), // Añade la ruta para la pantalla de registro
         '/home': (context) => const  HomePage(title: 'Gestor de Gastos'), // Tu pantalla principal
       },
 

@@ -10,6 +10,7 @@ class GastosProvider extends ChangeNotifier {
   final _supabase = Supabase.instance.client;
   bool _isInitialized = false;
   bool _baseDataAdded = false;
+  String? _userId; // Almacena el ID del usuario autenticado
 
   GastosProvider() {
     if (_isInitialized) {
@@ -20,7 +21,7 @@ class GastosProvider extends ChangeNotifier {
       print('Inicializando GastosProvider...');
       print('Estado inicial de _gastosBox: isOpen=${_gastosBox.isOpen}, length=${_gastosBox.length}');
       print('Estado inicial de _syncQueue: isOpen=${_syncQueue.isOpen}, length=${_syncQueue.length}');
-      _initializeBaseData();
+      _initialize();
       _isInitialized = true;
       print('GastosProvider inicializado correctamente.');
     } catch (e, stackTrace) {
@@ -33,22 +34,87 @@ class GastosProvider extends ChangeNotifier {
   List<Gasto> get gastos => _gastosBox.values.toList();
   List<String> get responsables => _responsables;
 
-  Future<void> _initializeBaseData() async {
-    await _agregarDatosBase();
+  Future<void> _initialize() async {
+    // Obtiene el usuario autenticado
+    _userId = _supabase.auth.currentUser?.id;
+    if (_userId == null) {
+      print('No hay usuario autenticado. No se inicializarán datos base.');
+      return;
+    }
+
+    // Verifica si los datos base ya existen para este usuario
+    final userData = await _supabase
+        .from('user_data')
+        .select('has_base_data')
+        .eq('user_id', _userId!)
+        .maybeSingle();
+
+    if (userData != null && userData['has_base_data'] == true) {
+      print('Datos base ya existen para el usuario $_userId, cargando datos...');
+      await _loadExistingData();
+    } else {
+      print('No se encontraron datos base para el usuario $_userId, agregando datos base...');
+      await _agregarDatosBase();
+      // Marca que los datos base fueron agregados para este usuario
+      await _supabase
+          .from('user_data')
+          .upsert({'user_id': _userId, 'has_base_data': true});
+    }
+
     _cargarResponsablesDesdeGastos();
     await _sincronizarConSupabase();
   }
 
-  Future<void> _agregarDatosBase() async {
-    if (_baseDataAdded || _gastosBox.isNotEmpty) {
-      print('Datos base ya agregados o caja no vacía, saltando...');
-      return;
+  Future<void> _loadExistingData() async {
+    // Carga los datos existentes desde Supabase
+    final response = await _supabase
+        .from('gastos')
+        .select()
+        .eq('user_id', _userId!);
+
+    for (var gastoData in response) {
+      final gasto = Gasto(
+        id: gastoData['id'].toString(),
+        precio: gastoData['precio'].toDouble(),
+        fecha: DateTime.parse(gastoData['fecha']),
+        responsable: gastoData['responsable'],
+        etiquetas: List<String>.from(gastoData['etiquetas'] ?? []),
+      );
+      await _gastosBox.add(gasto);
+
+      // Carga los subgastos asociados
+      final subGastosResponse = await _supabase
+          .from('subgastos')
+          .select()
+          .eq('gasto_id', gastoData['id']);
+
+      for (var subGastoData in subGastosResponse) {
+        final subGasto = SubGasto(
+          id: subGastoData['id'].toString(),
+          descripcion: subGastoData['descripcion'],
+          precio: subGastoData['precio'].toDouble(),
+          esIndividual: subGastoData['esIndividual'],
+          responsable: subGastoData['responsable'],
+          key: subGastoData['key'],
+        );
+        gasto.subGastos?.add(subGasto);
+      }
+      await gasto.save();
     }
+    print('Datos cargados desde Supabase para el usuario $_userId: ${_gastosBox.length} gastos');
+  }
 
-    print('Agregando datos base...');
+  Future<void> _agregarDatosBase() async {
+    print('Agregando datos base para el usuario $_userId...');
 
-    // Agregar el primer Gasto
-    final gasto0 = Gasto(precio: 1000.0, fecha: DateTime(2025, 2, 15), responsable: 'Ana', subGastos: [], etiquetas: []);
+    // Agrega los gastos y subgastos con user_id
+    final gasto0 = Gasto(
+      precio: 1000.0,
+      fecha: DateTime(2025, 2, 15),
+      responsable: 'Ana',
+      subGastos: [],
+      etiquetas: [],
+    );
     await agregarGasto(gasto0, caller: '_agregarDatosBase (Gasto 0)');
     print('Gasto 0 agregado con key: ${gasto0.key}');
     await _waitForGastoId(gasto0);
@@ -56,8 +122,13 @@ class GastosProvider extends ChangeNotifier {
     await agregarSubGasto(0, SubGasto(precio: 600.0, responsable: 'Ana', descripcion: 'Comida', esIndividual: true));
     await agregarSubGasto(0, SubGasto(precio: 400.0, responsable: 'Ana', descripcion: 'Transporte', esIndividual: true));
 
-    // Agregar el segundo Gasto
-    final gasto1 = Gasto(precio: 500.0, fecha: DateTime(2025, 3, 10), responsable: 'Juan', subGastos: [], etiquetas: []);
+    final gasto1 = Gasto(
+      precio: 500.0,
+      fecha: DateTime(2025, 3, 10),
+      responsable: 'Juan',
+      subGastos: [],
+      etiquetas: [],
+    );
     await agregarGasto(gasto1, caller: '_agregarDatosBase (Gasto 1)');
     print('Gasto 1 agregado con key: ${gasto1.key}');
     await _waitForGastoId(gasto1);
@@ -65,8 +136,13 @@ class GastosProvider extends ChangeNotifier {
     await agregarSubGasto(1, SubGasto(precio: 300.0, responsable: 'Juan', descripcion: 'Materiales', esIndividual: true));
     await agregarSubGasto(1, SubGasto(precio: 200.0, responsable: 'Juan', descripcion: 'Otros', esIndividual: true));
 
-    // Agregar el tercer Gasto
-    final gasto2 = Gasto(precio: 1200.0, fecha: DateTime(2025, 4, 1), responsable: 'Ana', subGastos: [], etiquetas: []);
+    final gasto2 = Gasto(
+      precio: 1200.0,
+      fecha: DateTime(2025, 4, 1),
+      responsable: 'Ana',
+      subGastos: [],
+      etiquetas: [],
+    );
     await agregarGasto(gasto2, caller: '_agregarDatosBase (Gasto 2)');
     print('Gasto 2 agregado con key: ${gasto2.key}');
     await _waitForGastoId(gasto2);
@@ -96,6 +172,11 @@ class GastosProvider extends ChangeNotifier {
   }
 
   Future<void> agregarGasto(Gasto gasto, {String caller = 'Unknown'}) async {
+    if (_userId == null) {
+      print('No hay usuario autenticado. No se puede agregar gasto.');
+      return;
+    }
+
     print('agregarGasto llamado por: $caller');
     print('Estado de _gastosBox antes de agregar: isOpen=${_gastosBox.isOpen}, length=${_gastosBox.length}');
     final nuevoGasto = gasto..subGastos = gasto.subGastos ?? [];
@@ -106,7 +187,7 @@ class GastosProvider extends ChangeNotifier {
     if (gasto.responsable != null && !_responsables.contains(gasto.responsable)) {
       _responsables.add(gasto.responsable!);
     }
-    await _queueSyncOperation('INSERT', 'gastos', nuevoGasto, key: key);
+    await _queueSyncOperation('INSERT', 'gastos', {...nuevoGasto.toJson(), 'user_id': _userId}, key: key);
     print('Total gastos después de agregar: ${_gastosBox.length}');
     notifyListeners();
   }
@@ -123,14 +204,14 @@ class GastosProvider extends ChangeNotifier {
     if (gastoEditado.responsable != null && !_responsables.contains(gastoEditado.responsable)) {
       _responsables.add(gastoEditado.responsable!);
     }
-    await _queueSyncOperation('UPDATE', 'gastos', gasto, key: gasto.key);
+    await _queueSyncOperation('UPDATE', 'gastos', {...gasto.toJson(), 'user_id': _userId}, key: gasto.key);
     print('Total gastos después de editar: ${_gastosBox.length}');
     notifyListeners();
   }
 
   Future<void> eliminarGasto(int index) async {
     final gasto = _gastosBox.getAt(index)!;
-    await _queueSyncOperation('DELETE', 'gastos', gasto, key: gasto.key);
+    await _queueSyncOperation('DELETE', 'gastos', {...gasto.toJson(), 'user_id': _userId}, key: gasto.key);
     await _gastosBox.deleteAt(index);
     _cargarResponsablesDesdeGastos();
     print('Total gastos después de eliminar: ${_gastosBox.length}');
@@ -138,6 +219,11 @@ class GastosProvider extends ChangeNotifier {
   }
 
   Future<void> agregarSubGasto(int gastoIndex, SubGasto subGasto) async {
+    if (_userId == null) {
+      print('No hay usuario autenticado. No se puede agregar subgasto.');
+      return;
+    }
+
     print('agregarSubGasto: Intentando acceder a Gasto en índice $gastoIndex');
     print('Estado de _gastosBox: length=${_gastosBox.length}');
     final gasto = _gastosBox.getAt(gastoIndex)!;
@@ -150,9 +236,14 @@ class GastosProvider extends ChangeNotifier {
     await gasto.save();
     print('SubGasto agregado con key: ${subGasto.key}, gasto id: ${gasto.id}');
     if (gasto.id == null) {
+      print('Gasto.id es null, esperando ID...');
       await _waitForGastoId(gasto);
+      if (gasto.id == null) {
+        print('Error: No se pudo obtener el ID del Gasto después de esperar. No se sincronizará el SubGasto.');
+        return;
+      }
     }
-    await _queueSyncOperation('INSERT', 'subgastos', subGasto, parentId: gasto.id, key: subGasto.key);
+    await _queueSyncOperation('INSERT', 'subgastos', {...subGasto.toJson(), 'user_id': _userId}, parentId: gasto.id, key: subGasto.key);
     print('Total gastos después de agregar SubGasto: ${_gastosBox.length}');
     notifyListeners();
   }
@@ -160,7 +251,7 @@ class GastosProvider extends ChangeNotifier {
   Future<void> eliminarSubGasto(int gastoIndex, int subGastoIndex) async {
     final gasto = _gastosBox.getAt(gastoIndex)!;
     final subGasto = gasto.subGastos![subGastoIndex];
-    await _queueSyncOperation('DELETE', 'subgastos', subGasto, parentId: gasto.id, key: subGasto.key);
+    await _queueSyncOperation('DELETE', 'subgastos', {...subGasto.toJson(), 'user_id': _userId}, parentId: gasto.id, key: subGasto.key);
     gasto.subGastos!.removeAt(subGastoIndex);
     await gasto.save();
     _cargarResponsablesDesdeGastos();
@@ -185,7 +276,7 @@ class GastosProvider extends ChangeNotifier {
     await gasto.save();
     print('Después de guardar en Hive (index: $subGastoIndex): esIndividual=${subGasto.esIndividual}');
     print('SubGasto editado con key: ${subGasto.key}, id: ${subGasto.id}, gasto id: ${gasto.id}');
-    await _queueSyncOperation('UPDATE', 'subgastos', subGasto, parentId: gasto.id, key: subGasto.key);
+    await _queueSyncOperation('UPDATE', 'subgastos', {...subGasto.toJson(), 'user_id': _userId}, parentId: gasto.id, key: subGasto.key);
     print('Total gastos después de editar SubGasto: ${_gastosBox.length}');
     notifyListeners();
   }
@@ -242,6 +333,7 @@ class GastosProvider extends ChangeNotifier {
       'parentId': parentId,
       'key': key,
       'timestamp': DateTime.now().toIso8601String(),
+      'attempts': 0,
     };
     final syncKey = await _syncQueue.add(syncData);
     print('Operación en cola: $operation, tabla: $table, key: $key, parentId: $parentId, syncKey: $syncKey');
@@ -255,6 +347,7 @@ class GastosProvider extends ChangeNotifier {
 
     while (gasto.id == null && attempts < maxAttempts) {
       print('Esperando ID para gasto con key ${gasto.key}, intento ${attempts + 1}...');
+      print('Estado de _syncQueue: length=${_syncQueue.length}, keys=${_syncQueue.keys}');
       await Future.delayed(delay);
       await _sincronizarConSupabase();
       attempts++;
@@ -274,6 +367,7 @@ class GastosProvider extends ChangeNotifier {
         return;
       }
 
+      print('Iniciando sincronización con Supabase. Operaciones en cola: ${_syncQueue.length}');
       final operations = _syncQueue.toMap();
       for (var entry in operations.entries) {
         final int syncKey = entry.key;
@@ -300,7 +394,6 @@ class GastosProvider extends ChangeNotifier {
               if (key != null) {
                 print('Buscando Gasto con key $key en _gastosBox...');
                 print('Estado de _gastosBox: length=${_gastosBox.length}, keys=${_gastosBox.keys}');
-                // Use firstWhere with a proper orElse that throws an exception
                 final gasto = _gastosBox.values.firstWhere(
                   (g) => g.key == key,
                   orElse: () => throw Exception('Gasto con key $key no encontrado en _gastosBox'),
@@ -380,12 +473,12 @@ class GastosProvider extends ChangeNotifier {
           print('Error específico en operación ($table, $operation, syncKey: $syncKey): $e');
           print('Stack trace: $stackTrace');
           syncData['attempts'] = (syncData['attempts'] as int? ?? 0) + 1;
-          if (syncData['attempts'] >= 3) {
+          if (syncData['attempts'] >= 5) {
             print('Máximo de intentos alcanzado para operación ($table, $operation, syncKey: $syncKey). Eliminando de la cola.');
             await _syncQueue.delete(syncKey);
           } else {
             await _syncQueue.put(syncKey, syncData);
-            print('Operación reintentada (intento ${syncData['attempts']}/3) para ($table, $operation, syncKey: $syncKey).');
+            print('Operación reintentada (intento ${syncData['attempts']}/5) para ($table, $operation, syncKey: $syncKey).');
           }
         }
       }

@@ -1,47 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class SignUpScreen extends StatefulWidget {
+  const SignUpScreen({super.key});
 
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  _SignUpScreenState createState() => _SignUpScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _supabase = Supabase.instance.client;
 
-  Future<void> _signIn() async {
+  Future<void> _signUpWithEmail() async {
     try {
-      final response = await _supabase.auth.signInWithPassword(
+      final response = await _supabase.auth.signUp(
         email: _emailController.text,
         password: _passwordController.text,
       );
       if (response.user != null) {
-        Navigator.pushReplacementNamed(context, '/home');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Registro exitoso. Por favor, inicia sesión.')),
+        );
+        Navigator.pushReplacementNamed(context, '/login');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al iniciar sesión: $e')),
+        SnackBar(content: Text('Error al registrarse: $e')),
       );
     }
   }
 
-  Future<void> _signInWithGoogle() async {
+  Future<void> _signUpWithGoogle() async {
     try {
       final response = await _supabase.auth.signInWithOAuth(
-        OAuthProvider.google, // Usa Provider.google en lugar de OAuthProvider.google
+        OAuthProvider.google,
         redirectTo: 'http://localhost:3000/auth/callback', // Ajusta según tu configuración
       );
       if (response) {
-        print('Iniciando sesión con Google...');
+        print('Iniciando registro con Google...');
+        // Si el registro/inicio de sesión con Google es exitoso, Supabase manejará la redirección
         Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al iniciar sesión con Google: $e')),
+        SnackBar(content: Text('Error al registrarse con Google: $e')),
       );
     }
   }
@@ -56,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Iniciar Sesión')),
+      appBar: AppBar(title: const Text('Registrarse')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -75,20 +79,20 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: _signIn,
-              child: const Text('Iniciar Sesión con Email'),
+              onPressed: _signUpWithEmail,
+              child: const Text('Registrarse con Email'),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _signInWithGoogle,
-              child: const Text('Iniciar Sesión con Google'),
+              onPressed: _signUpWithGoogle,
+              child: const Text('Registrarse con Google'),
             ),
             const SizedBox(height: 16),
             TextButton(
               onPressed: () {
-                Navigator.pushNamed(context, '/signup');
+                Navigator.pushNamed(context, '/login');
               },
-              child: const Text('¿No tienes cuenta? Regístrate'),
+              child: const Text('¿Ya tienes cuenta? Inicia sesión'),
             ),
           ],
         ),
