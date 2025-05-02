@@ -33,7 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final response = await _supabase.auth.signInWithOAuth(
         OAuthProvider.google, // Usa Provider.google en lugar de OAuthProvider.google
-        redirectTo: 'http://localhost:3000/auth/callback', // Ajusta según tu configuración
+        redirectTo: 'https://kqkgkutjrbwifvpyzvrt.supabase.co/auth/v1/callback', // Ajusta según tu configuración
       );
       if (response) {
         print('Iniciando sesión con Google...');

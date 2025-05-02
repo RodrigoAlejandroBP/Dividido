@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:gestor_gastos/providers/gastos_provider.dart';
 import 'package:gestor_gastos/widgets/gastos_widget.dart';
 import 'package:gestor_gastos/pages/agregar_detalle_page.dart';
@@ -20,7 +21,6 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // Removed unnecessary setState to prevent duplicate rebuilds
     print('HomePage: Inicializando...');
   }
 
@@ -58,6 +58,20 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  Future<void> _signOut(BuildContext context) async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+      // Opcional: Limpia cualquier estado local si es necesario
+      final gastosProvider = Provider.of<GastosProvider>(context, listen: false);
+      // Aquí podrías añadir lógica para limpiar el estado del provider si es necesario
+      Navigator.pushReplacementNamed(context, '/login');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cerrar sesión: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
@@ -73,6 +87,13 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Cerrar Sesión',
+            onPressed: () => _signOut(context),
+          ),
+        ],
       ),
       body: pages[_selectedIndex],
       floatingActionButton: _selectedIndex == 0
